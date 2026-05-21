@@ -87,7 +87,7 @@ transform = transforms.Compose([
 # LOAD TEST IMAGE
 # ============================================
 
-image_path = "test_image.jpeg"
+image_path = "00000002_000.png"
 
 original_image = Image.open(
     image_path
