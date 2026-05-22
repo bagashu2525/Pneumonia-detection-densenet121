@@ -3,321 +3,750 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>AI Pneumonia Detection</title>
+  <title>PneumoScan - AI Pneumonia Detection</title>
   <style>
-    * {
-      margin: 0;
-      padding: 0;
-      box-sizing: border-box;
-      font-family: "Segoe UI", Arial, sans-serif;
+    :root {
+      --blue: #2563eb;
+      --blue-dark: #1e40af;
+      --navy: #0f172a;
+      --gray: #64748b;
+      --green: #16a34a;
+      --green-light: #c6f6d5;
+      --red: #dc2626;
+      --red-light: #fecaca;
     }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    html { scroll-behavior: smooth; }
 
     body {
-      min-height: 100vh;
-      display: flex;
-      flex-direction: column;
+      font-family: "Segoe UI", system-ui, Arial, sans-serif;
       background: #f0f4f8;
-      color: #1a1a2e;
-    }
-
-    /* HEADER */
-    header {
-      background: #fff;
-      padding: 1rem 2rem;
-      box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
-      display: flex;
-      align-items: center;
-      gap: 12px;
-    }
-
-    .logo {
-      font-size: 2rem;
-    }
-
-    header h1 {
-      font-size: 1.5rem;
-      font-weight: 700;
-      color: #1565c0;
-    }
-
-    /* MAIN */
-    main {
-      flex: 1;
-      max-width: 900px;
-      width: 100%;
-      margin: 0 auto;
-      padding: 2rem 1.5rem;
-    }
-
-    /* HERO */
-    .hero {
-      text-align: center;
-      margin-bottom: 2rem;
-    }
-
-    .hero h2 {
-      font-size: 1.75rem;
-      color: #333;
-      font-weight: 600;
-    }
-
-    /* UPLOAD */
-    .upload-area {
-      background: #fff;
-      border: 2px dashed #42a5f5;
-      border-radius: 12px;
-      padding: 2.5rem 2rem;
-      text-align: center;
-      transition: border-color 0.2s, background 0.2s;
-    }
-
-    .upload-area.dragover {
-      border-color: #1565c0;
-      background: #e3f2fd;
-    }
-
-    .upload-area p {
-      color: #555;
-      margin-bottom: 1.25rem;
-      font-size: 1rem;
-    }
-
-    .btn {
-      background: #1565c0;
-      color: #fff;
-      border: none;
-      padding: 0.75rem 1.5rem;
-      font-size: 1rem;
-      border-radius: 8px;
-      cursor: pointer;
-      font-weight: 600;
-    }
-
-    .btn:hover {
-      background: #0d47a1;
-    }
-
-    .btn:disabled {
-      background: #90caf9;
-      cursor: not-allowed;
-    }
-
-    .btn-analyze {
-      background: #2e7d32;
-      margin-top: 1.5rem;
-      padding: 0.9rem 2rem;
-      font-size: 1.1rem;
-    }
-
-    .btn-analyze:hover:not(:disabled) {
-      background: #1b5e20;
-    }
-
-    #fileInput {
-      display: none;
-    }
-
-    /* PREVIEW */
-    .preview-section {
-      margin-top: 2rem;
-      background: #fff;
-      border-radius: 12px;
-      padding: 1.5rem;
-      box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
-      display: none;
-    }
-
-    .preview-section.visible {
-      display: block;
-    }
-
-    .preview-section h3 {
-      margin-bottom: 1rem;
-      font-size: 1.1rem;
-      color: #444;
-    }
-
-    .preview-section img {
-      max-width: 100%;
-      max-height: 400px;
-      border-radius: 8px;
-      border: 1px solid #ddd;
-      display: block;
-      margin: 0 auto;
-    }
-
-    .analyze-wrap {
-      text-align: center;
-    }
-
-    /* RESULTS */
-    .results-panel {
-      margin-top: 2rem;
-      background: #fff;
-      border-radius: 12px;
-      padding: 1.5rem 2rem;
-      box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
-      display: none;
-    }
-
-    .results-panel.visible {
-      display: block;
-    }
-
-    .results-panel h3 {
-      margin-bottom: 1rem;
-      font-size: 1.2rem;
-      color: #333;
-    }
-
-    .result-row {
-      display: flex;
-      justify-content: space-between;
-      padding: 0.75rem 0;
-      border-bottom: 1px solid #eee;
-      font-size: 1.05rem;
-    }
-
-    .result-row:last-child {
-      border-bottom: none;
-    }
-
-    .result-label {
-      color: #666;
-      font-weight: 500;
-    }
-
-    .result-value {
-      font-weight: 700;
-    }
-
-    .result-value.pneumonia {
-      color: #c62828;
-    }
-
-    .result-value.normal {
-      color: #2e7d32;
-    }
-
-    .error-msg {
-      color: #c62828;
-      text-align: center;
-      margin-top: 1rem;
-      font-weight: 500;
-      display: none;
-    }
-
-    .error-msg.visible {
-      display: block;
-    }
-
-    .loading {
-      text-align: center;
-      color: #1565c0;
-      margin-top: 1rem;
-      display: none;
-    }
-
-    .loading.visible {
-      display: block;
-    }
-
-    /* FOOTER */
-    footer {
-      background: #263238;
-      color: #b0bec5;
-      text-align: center;
-      padding: 1.25rem 1.5rem;
-      font-size: 0.9rem;
+      color: var(--navy);
       line-height: 1.5;
     }
 
-    footer strong {
-      color: #fff;
+    /* ========== NAVBAR ========== */
+    .navbar {
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      background: #fff;
+      height: 85px;
+      padding: 0 2.5rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      box-shadow: 0 2px 15px rgba(0, 0, 0, 0.08);
     }
 
-    @media (max-width: 600px) {
-      header h1 {
-        font-size: 1.2rem;
-      }
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      text-decoration: none;
+      color: inherit;
+    }
 
-      .hero h2 {
-        font-size: 1.35rem;
-      }
+    .brand-icon {
+      width: 48px;
+      height: 48px;
+      background: linear-gradient(135deg, #3b82f6, #1d4ed8);
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.6rem;
+    }
+
+    .brand-text .title {
+      font-size: 32px;
+      font-weight: 800;
+      color: var(--blue-dark);
+      line-height: 1.1;
+    }
+
+    .brand-text .subtitle {
+      font-size: 14px;
+      color: var(--gray);
+    }
+
+    .nav-menu {
+      display: flex;
+      align-items: center;
+      gap: 28px;
+      list-style: none;
+    }
+
+    .nav-menu a {
+      text-decoration: none;
+      color: #334155;
+      font-size: 15px;
+      font-weight: 500;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      transition: color 0.3s;
+      padding-bottom: 4px;
+      border-bottom: 3px solid transparent;
+    }
+
+    .nav-menu a:hover { color: var(--blue); }
+
+    .nav-menu a.active {
+      color: var(--blue);
+      border-bottom-color: var(--blue);
+    }
+
+    /* ========== HERO ========== */
+    .hero {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 4rem 2rem 3rem;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 3rem;
+      align-items: center;
+    }
+
+    .hero h1 {
+      font-size: clamp(2.5rem, 5vw, 4rem);
+      font-weight: 800;
+      color: var(--navy);
+      line-height: 1.15;
+      margin-bottom: 1.25rem;
+    }
+
+    .hero p {
+      font-size: 1.15rem;
+      color: var(--gray);
+      max-width: 520px;
+    }
+
+    .hero-visual {
+      display: flex;
+      justify-content: center;
+      opacity: 0.85;
+    }
+
+    .hero-visual svg {
+      width: 100%;
+      max-width: 350px;
+    }
+
+    /* ========== MAIN CONTENT ========== */
+    .container {
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 0 2rem 3rem;
+    }
+
+    .upload-card {
+      background: #fff;
+      border-radius: 20px;
+      padding: 40px;
+      box-shadow: 0 5px 20px rgba(0, 0, 0, 0.08);
+      margin-bottom: 2rem;
+    }
+
+    .drop-zone {
+      border: 2px dashed #4f7cf7;
+      border-radius: 15px;
+      padding: 3rem 2rem;
+      text-align: center;
+      transition: background 0.2s, border-color 0.2s;
+      cursor: pointer;
+    }
+
+    .drop-zone.dragover {
+      background: #eff6ff;
+      border-color: var(--blue);
+    }
+
+    .drop-zone .cloud {
+      font-size: 3.5rem;
+      margin-bottom: 1rem;
+    }
+
+    .drop-zone h3 {
+      font-size: 1.35rem;
+      margin-bottom: 0.5rem;
+      color: var(--navy);
+    }
+
+    .drop-zone .desc {
+      color: var(--gray);
+      margin-bottom: 0.5rem;
+    }
+
+    .drop-zone .formats {
+      font-size: 0.9rem;
+      color: #94a3b8;
+      margin-bottom: 1.5rem;
+    }
+
+    .btn-primary {
+      background: var(--blue);
+      color: #fff;
+      border: none;
+      padding: 15px 40px;
+      border-radius: 10px;
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.2s, transform 0.2s;
+    }
+
+    .btn-primary:hover { background: var(--blue-dark); }
+
+    #fileInput { display: none; }
+
+    /* ========== RESULT CARDS ========== */
+    .results-row {
+      display: none;
+      gap: 30px;
+      margin-bottom: 2rem;
+    }
+
+    .results-row.visible {
+      display: flex;
+      flex-wrap: wrap;
+    }
+
+    .result-card {
+      flex: 1;
+      min-width: 280px;
+      background: #fff;
+      border-radius: 20px;
+      padding: 24px;
+      box-shadow: 0 5px 20px rgba(0, 0, 0, 0.06);
+    }
+
+    .result-card h3 {
+      font-size: 1.15rem;
+      margin-bottom: 1rem;
+      color: #334155;
+    }
+
+    .preview-wrap {
+      position: relative;
+      border-radius: 12px;
+      overflow: hidden;
+      background: #f8fafc;
+      min-height: 220px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .preview-wrap img {
+      max-width: 100%;
+      max-height: 280px;
+      object-fit: contain;
+    }
+
+    .file-meta {
+      margin-top: 1rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    .file-name {
+      font-size: 0.9rem;
+      color: var(--gray);
+      word-break: break-all;
+    }
+
+    .btn-remove {
+      background: #fee2e2;
+      color: var(--red);
+      border: none;
+      padding: 8px 14px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 0.9rem;
+      white-space: nowrap;
+    }
+
+    .btn-remove:hover { background: #fecaca; }
+
+    /* Analysis circle */
+    .analysis-inner {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+    }
+
+    .prediction-circle {
+      width: 280px;
+      height: 280px;
+      border-radius: 50%;
+      border: 2px solid var(--green-light);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 1.25rem;
+      transition: border-color 0.3s;
+    }
+
+    .prediction-circle.pneumonia {
+      border-color: var(--red-light);
+    }
+
+    .prediction-circle .lung-icon { font-size: 3rem; margin-bottom: 0.5rem; }
+
+    .prediction-label {
+      font-size: 1.75rem;
+      font-weight: 800;
+    }
+
+    .prediction-label.normal { color: var(--green); }
+    .prediction-label.pneumonia { color: var(--red); }
+
+    .prediction-desc {
+      font-size: 0.95rem;
+      color: var(--gray);
+      margin-top: 0.5rem;
+      padding: 0 1.5rem;
+    }
+
+    .confidence-block {
+      width: 100%;
+      margin-top: 0.5rem;
+    }
+
+    .confidence-block .label {
+      font-size: 0.9rem;
+      color: var(--gray);
+      margin-bottom: 0.25rem;
+    }
+
+    .confidence-score {
+      font-size: 42px;
+      font-weight: 800;
+      color: var(--green);
+    }
+
+    .confidence-score.pneumonia { color: var(--red); }
+
+    .info-box {
+      margin-top: 1.25rem;
+      padding: 1rem 1.25rem;
+      background: #f9fafb;
+      border-radius: 12px;
+      font-size: 0.88rem;
+      color: #64748b;
+      text-align: left;
+    }
+
+    .info-box strong {
+      display: block;
+      color: #334155;
+      margin-bottom: 0.35rem;
+    }
+
+    .placeholder-text {
+      color: #94a3b8;
+      padding: 3rem 1rem;
+      text-align: center;
+    }
+
+    .analysis-result-panel {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      width: 100%;
+    }
+
+    .analysis-result-panel[hidden] {
+      display: none !important;
+    }
+
+    /* ========== ANALYZE BUTTON ========== */
+    .analyze-wrap {
+      text-align: center;
+      margin-bottom: 3rem;
+    }
+
+    .btn-analyze {
+      width: 100%;
+      max-width: 600px;
+      height: 60px;
+      background: var(--blue);
+      color: #fff;
+      border: none;
+      border-radius: 12px;
+      font-size: 1.35rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: transform 0.2s, background 0.2s;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+    }
+
+    .btn-analyze:hover:not(:disabled) {
+      transform: scale(1.02);
+      background: var(--blue-dark);
+    }
+
+    .btn-analyze:disabled {
+      background: #93c5fd;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    .spinner {
+      width: 22px;
+      height: 22px;
+      border: 3px solid rgba(255,255,255,0.35);
+      border-top-color: #fff;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      display: none;
+    }
+
+    .btn-analyze.loading .spinner { display: block; }
+    .btn-analyze.loading .btn-text { display: none; }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .error-banner {
+      background: #fef2f2;
+      color: var(--red);
+      padding: 12px 20px;
+      border-radius: 10px;
+      margin-bottom: 1.5rem;
+      display: none;
+      text-align: center;
+      font-weight: 500;
+    }
+
+    .error-banner.visible { display: block; }
+
+    /* ========== FEATURES ========== */
+    .features {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 20px;
+      margin-bottom: 2.5rem;
+    }
+
+    .feature-card {
+      background: #fff;
+      border-radius: 16px;
+      padding: 1.75rem;
+      box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+      text-align: center;
+    }
+
+    .feature-card .icon { font-size: 2.25rem; margin-bottom: 0.75rem; }
+
+    .feature-card h4 {
+      font-size: 1.1rem;
+      margin-bottom: 0.5rem;
+      color: var(--navy);
+    }
+
+    .feature-card p {
+      font-size: 0.9rem;
+      color: var(--gray);
+    }
+
+    /* ========== DISCLAIMER ========== */
+    .disclaimer {
+      background: #f9fafb;
+      border-radius: 16px;
+      padding: 2rem 2.5rem;
+      display: flex;
+      gap: 1.25rem;
+      align-items: flex-start;
+      margin-bottom: 2rem;
+    }
+
+    .disclaimer .shield { font-size: 2rem; flex-shrink: 0; }
+
+    .disclaimer h3 {
+      font-size: 1.2rem;
+      margin-bottom: 0.5rem;
+      color: var(--navy);
+    }
+
+    .disclaimer p {
+      color: var(--gray);
+      font-size: 0.95rem;
+    }
+
+    /* ========== SECTIONS ========== */
+    .section-block {
+      max-width: 1100px;
+      margin: 0 auto 3rem;
+      padding: 0 2rem;
+    }
+
+    .section-block h2 {
+      font-size: 1.75rem;
+      margin-bottom: 1rem;
+      color: var(--navy);
+    }
+
+    .section-block p { color: var(--gray); }
+
+    .faq-item {
+      background: #fff;
+      padding: 1.25rem;
+      border-radius: 12px;
+      margin-bottom: 12px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+    }
+
+    .faq-item strong { color: var(--blue-dark); }
+
+    .history-list {
+      list-style: none;
+    }
+
+    .history-list li {
+      background: #fff;
+      padding: 12px 16px;
+      border-radius: 10px;
+      margin-bottom: 8px;
+      font-size: 0.9rem;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.04);
+    }
+
+    .history-empty { color: var(--gray); font-style: italic; }
+
+    /* ========== FOOTER ========== */
+    footer {
+      text-align: center;
+      padding: 1.5rem;
+      color: var(--gray);
+      font-size: 14px;
+      background: #fff;
+      border-top: 1px solid #e2e8f0;
+    }
+
+    @media (max-width: 900px) {
+      .navbar { padding: 0 1rem; height: auto; min-height: 85px; flex-wrap: wrap; gap: 12px; }
+      .nav-menu { gap: 14px; flex-wrap: wrap; font-size: 13px; }
+      .brand-text .title { font-size: 24px; }
+      .hero { grid-template-columns: 1fr; text-align: center; }
+      .hero p { margin: 0 auto; }
+      .features { grid-template-columns: 1fr; }
+      .results-row.visible { flex-direction: column; }
     }
   </style>
 </head>
 <body>
 
-  <header>
-    <span class="logo" aria-hidden="true">🫁</span>
-    <h1>AI Pneumonia Detection</h1>
-  </header>
-
-  <main>
-    <section class="hero">
-      <h2>Upload Chest X-ray for Analysis</h2>
-    </section>
-
-    <section class="upload-area" id="dropZone">
-      <p>Upload Chest X-ray image (.jpg, .png, .jpeg)</p>
-      <input type="file" id="fileInput" accept=".jpg,.jpeg,.png,image/jpeg,image/png">
-      <button type="button" class="btn" id="chooseBtn">Choose File</button>
-    </section>
-
-    <p class="error-msg" id="errorMsg"></p>
-    <p class="loading" id="loading">Analyzing X-ray with DenseNet121 model...</p>
-
-    <section class="preview-section" id="previewSection">
-      <h3>Preview</h3>
-      <img id="previewImg" src="" alt="Uploaded chest X-ray preview">
-      <div class="analyze-wrap">
-        <button type="button" class="btn btn-analyze" id="analyzeBtn" disabled>
-          Detect Pneumonia
-        </button>
+  <!-- NAVBAR -->
+  <nav class="navbar">
+    <a href="#home" class="brand">
+      <div class="brand-icon">🫁</div>
+      <div class="brand-text">
+        <div class="title">PneumoScan</div>
+        <div class="subtitle">AI Pneumonia Detection</div>
       </div>
-    </section>
+    </a>
+    <ul class="nav-menu">
+      <li><a href="#home" class="active" data-nav>🏠 Home</a></li>
+      <li><a href="#how-it-works" data-nav>⚙ How It Works</a></li>
+      <li><a href="#about" data-nav>🛡 About</a></li>
+      <li><a href="#faq" data-nav>❓ FAQ</a></li>
+      <li><a href="#history" data-nav>🕒 History</a></li>
+    </ul>
+  </nav>
 
-    <section class="results-panel" id="resultsPanel">
-      <h3>Results</h3>
-      <div class="result-row">
-        <span class="result-label">Prediction</span>
-        <span class="result-value" id="predictionVal">—</span>
-      </div>
-      <div class="result-row">
-        <span class="result-label">Confidence score</span>
-        <span class="result-value" id="confidenceVal">—</span>
-      </div>
-    </section>
-  </main>
+  <!-- HERO -->
+  <section class="hero" id="home">
+    <div>
+      <h1>Detect Pneumonia with AI</h1>
+      <p>
+        Upload a chest X-ray image and our AI model will analyze it
+        to detect the presence of pneumonia.
+      </p>
+    </div>
+    <div class="hero-visual" aria-hidden="true">
+      <svg viewBox="0 0 350 280" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <ellipse cx="120" cy="140" rx="70" ry="90" fill="#93c5fd" opacity="0.5"/>
+        <ellipse cx="230" cy="140" rx="70" ry="90" fill="#93c5fd" opacity="0.5"/>
+        <circle cx="175" cy="130" r="75" stroke="#2563eb" stroke-width="3" fill="rgba(255,255,255,0.3)"/>
+        <line x1="250" y1="60" x2="310" y2="20" stroke="#2563eb" stroke-width="4"/>
+        <circle cx="310" cy="20" r="18" stroke="#2563eb" stroke-width="3" fill="#eff6ff"/>
+        <circle cx="165" cy="120" r="8" fill="#dc2626" opacity="0.7"/>
+        <circle cx="185" cy="145" r="6" fill="#16a34a" opacity="0.7"/>
+        <circle cx="170" cy="155" r="5" fill="#dc2626" opacity="0.6"/>
+      </svg>
+    </div>
+  </section>
 
-  <footer>
-    <strong>Medical disclaimer:</strong>
-    This tool is for research and educational purposes only.
-    Results are not a clinical diagnosis. Always consult a qualified radiologist.
-  </footer>
+  <div class="container">
+    <p class="error-banner" id="errorBanner"></p>
+
+    <!-- UPLOAD -->
+    <div class="upload-card">
+      <div class="drop-zone" id="dropZone">
+        <div class="cloud">☁️</div>
+        <h3>Upload Chest X-ray Image</h3>
+        <p class="desc">Drag &amp; drop your image here, or click to browse</p>
+        <p class="formats">Supports: JPG, JPEG, PNG &nbsp;|&nbsp; Max size: 10MB</p>
+        <input type="file" id="fileInput" accept=".jpg,.jpeg,.png,image/jpeg,image/png">
+        <button type="button" class="btn-primary" id="chooseBtn">Choose File</button>
+      </div>
+    </div>
+
+    <!-- ANALYZE (above results so output is visible) -->
+    <div class="analyze-wrap">
+      <button type="button" class="btn-analyze" id="analyzeBtn" disabled>
+        <span class="spinner"></span>
+        <span class="btn-text">Analyze X-ray</span>
+      </button>
+    </div>
+
+    <!-- RESULT CARDS -->
+    <div class="results-row" id="resultsRow">
+      <div class="result-card">
+        <h3>Uploaded X-ray</h3>
+        <div class="preview-wrap">
+          <img id="previewImg" src="" alt="X-ray preview">
+        </div>
+        <div class="file-meta">
+          <span class="file-name" id="fileName">—</span>
+          <button type="button" class="btn-remove" id="removeBtn">🗑 Remove</button>
+        </div>
+      </div>
+
+      <div class="result-card">
+        <h3>Analysis Result</h3>
+        <div class="analysis-inner" id="analysisInner">
+          <div class="placeholder-text" id="analysisPlaceholder">
+            Click "Analyze X-ray" to run AI detection
+          </div>
+          <div id="analysisResult" class="analysis-result-panel" hidden>
+            <div class="prediction-circle" id="predictionCircle">
+              <span class="lung-icon">🫁</span>
+              <span class="prediction-label" id="predictionLabel">—</span>
+            </div>
+            <p class="prediction-desc" id="predictionDesc"></p>
+            <div class="confidence-block">
+              <div class="label">Confidence Score</div>
+              <div class="confidence-score" id="confidenceScore">—</div>
+            </div>
+            <div class="info-box">
+              <strong>Result Information</strong>
+              This AI analysis is for informational purposes only
+              and should not replace professional medical diagnosis.
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- FEATURES -->
+    <div class="features">
+      <div class="feature-card">
+        <div class="icon">🛡</div>
+        <h4>AI Powered</h4>
+        <p>Advanced deep learning model for accurate detection.</p>
+      </div>
+      <div class="feature-card">
+        <div class="icon">🎯</div>
+        <h4>High Accuracy</h4>
+        <p>Trained on thousands of chest X-ray images.</p>
+      </div>
+      <div class="feature-card">
+        <div class="icon">🔒</div>
+        <h4>Secure &amp; Private</h4>
+        <p>Your data is processed locally and never stored on server.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- HOW IT WORKS -->
+  <section class="section-block" id="how-it-works">
+    <h2>How It Works</h2>
+    <p>1. Upload a chest X-ray (JPG, JPEG, or PNG). 2. Click Analyze X-ray. 3. Our DenseNet121 model (via inference.py) processes the image. 4. View prediction and confidence score instantly.</p>
+  </section>
+
+  <!-- ABOUT -->
+  <section class="section-block" id="about">
+    <h2>About PneumoScan</h2>
+    <p>PneumoScan uses transfer learning with DenseNet121 (CheXNet-style architecture) to classify chest X-rays as Normal or Pneumonia. Built for research and educational use in medical AI.</p>
+  </section>
+
+  <!-- FAQ -->
+  <section class="section-block" id="faq">
+    <h2>FAQ</h2>
+    <div class="faq-item"><strong>What file types are supported?</strong><br>JPG, JPEG, and PNG up to 10MB.</div>
+    <div class="faq-item"><strong>Is this a medical diagnosis?</strong><br>No. Always consult a qualified radiologist or doctor.</div>
+    <div class="faq-item"><strong>Which AI model is used?</strong><br>DenseNet121 trained on chest X-ray pneumonia data, loaded from best_pneumonia_model.pth.</div>
+  </section>
+
+  <!-- HISTORY -->
+  <section class="section-block" id="history">
+    <h2>Analysis History</h2>
+    <ul class="history-list" id="historyList">
+      <li class="history-empty">No analyses yet. Results appear here after you analyze an X-ray.</li>
+    </ul>
+  </section>
+
+  <!-- DISCLAIMER -->
+  <div class="container">
+    <div class="disclaimer">
+      <span class="shield">🛡</span>
+      <div>
+        <h3>Medical Disclaimer</h3>
+        <p>
+          This tool is designed to assist healthcare professionals and is not a substitute
+          for professional medical advice, diagnosis, or treatment. Always consult a qualified doctor.
+        </p>
+      </div>
+    </div>
+  </div>
+
+  <footer>© 2024 PneumoScan. All rights reserved.</footer>
 
   <script>
     const dropZone = document.getElementById("dropZone");
     const fileInput = document.getElementById("fileInput");
     const chooseBtn = document.getElementById("chooseBtn");
     const analyzeBtn = document.getElementById("analyzeBtn");
-    const previewSection = document.getElementById("previewSection");
+    const resultsRow = document.getElementById("resultsRow");
     const previewImg = document.getElementById("previewImg");
-    const resultsPanel = document.getElementById("resultsPanel");
-    const predictionVal = document.getElementById("predictionVal");
-    const confidenceVal = document.getElementById("confidenceVal");
-    const errorMsg = document.getElementById("errorMsg");
-    const loading = document.getElementById("loading");
+    const fileNameEl = document.getElementById("fileName");
+    const removeBtn = document.getElementById("removeBtn");
+    const errorBanner = document.getElementById("errorBanner");
+    const analysisPlaceholder = document.getElementById("analysisPlaceholder");
+    const analysisResult = document.getElementById("analysisResult");
+    const predictionCircle = document.getElementById("predictionCircle");
+    const predictionLabel = document.getElementById("predictionLabel");
+    const predictionDesc = document.getElementById("predictionDesc");
+    const confidenceScore = document.getElementById("confidenceScore");
+    const historyList = document.getElementById("historyList");
 
     let selectedFile = null;
 
     if (window.location.protocol === "file:") {
-      showError("Run: python app.py  then open http://127.0.0.1:5000");
-      chooseBtn.disabled = true;
+      showError("Run: python app.py then open http://127.0.0.1:5000");
     }
 
-    chooseBtn.addEventListener("click", () => fileInput.click());
+    chooseBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      fileInput.click();
+    });
+
+    dropZone.addEventListener("click", (e) => {
+      if (e.target === chooseBtn || e.target.closest("#chooseBtn")) return;
+      fileInput.click();
+    });
+
     fileInput.addEventListener("change", () => {
       if (fileInput.files[0]) handleFile(fileInput.files[0]);
     });
@@ -327,9 +756,7 @@
       dropZone.classList.add("dragover");
     });
 
-    dropZone.addEventListener("dragleave", () => {
-      dropZone.classList.remove("dragover");
-    });
+    dropZone.addEventListener("dragleave", () => dropZone.classList.remove("dragover"));
 
     dropZone.addEventListener("drop", (e) => {
       e.preventDefault();
@@ -337,87 +764,194 @@
       if (e.dataTransfer.files[0]) handleFile(e.dataTransfer.files[0]);
     });
 
+    removeBtn.addEventListener("click", clearImage);
     analyzeBtn.addEventListener("click", runAnalysis);
+
+    document.querySelectorAll("[data-nav]").forEach((link) => {
+      link.addEventListener("click", () => {
+        document.querySelectorAll("[data-nav]").forEach((l) => l.classList.remove("active"));
+        link.classList.add("active");
+      });
+    });
 
     function handleFile(file) {
       hideError();
-      resultsPanel.classList.remove("visible");
+      resetAnalysis();
 
-      const allowed = ["image/png", "image/jpeg"];
-      const ext = file.name.split(".").pop().toLowerCase();
-      if (!allowed.includes(file.type) && !["png", "jpg", "jpeg"].includes(ext)) {
-        showError("Please upload a .jpg, .jpeg, or .png image.");
+      const ext = (file.name.split(".").pop() || "").toLowerCase();
+      if (!["jpg", "jpeg", "png"].includes(ext)) {
+        showError("Only JPG, JPEG, and PNG files are allowed.");
         return;
       }
 
-      if (file.size > 25 * 1024 * 1024) {
-        showError("File exceeds 25MB limit.");
+      if (file.size > 10 * 1024 * 1024) {
+        showError("File exceeds 10MB limit.");
         return;
       }
 
       selectedFile = file;
+      fileNameEl.textContent = file.name;
+
       const reader = new FileReader();
       reader.onload = (e) => {
         previewImg.src = e.target.result;
-        previewSection.classList.add("visible");
+        resultsRow.classList.add("visible");
         analyzeBtn.disabled = false;
       };
       reader.readAsDataURL(file);
+    }
+
+    function clearImage() {
+      selectedFile = null;
+      fileInput.value = "";
+      previewImg.src = "";
+      fileNameEl.textContent = "—";
+      resultsRow.classList.remove("visible");
+      analyzeBtn.disabled = true;
+      resetAnalysis();
+    }
+
+    function resetAnalysis() {
+      analysisPlaceholder.textContent =
+        'Click "Analyze X-ray" to run AI detection';
+      analysisPlaceholder.style.display = "block";
+      analysisResult.hidden = true;
+    }
+
+    async function parseJsonResponse(response) {
+      const text = await response.text();
+      try {
+        return JSON.parse(text);
+      } catch {
+        throw new Error(
+          response.status === 404
+            ? "API not found. Restart server: python app.py"
+            : "Invalid server response. Use http://127.0.0.1:5000 (not Live Server)."
+        );
+      }
+    }
+
+    async function postPredict(formData) {
+      const endpoints = ["/api/predict", "/predict"];
+      let lastError = null;
+
+      for (const url of endpoints) {
+        const response = await fetch(url, { method: "POST", body: formData });
+        const data = await parseJsonResponse(response);
+
+        if (response.ok) {
+          return data;
+        }
+
+        lastError = data.error || `Request failed (${response.status})`;
+        if (response.status !== 404) {
+          throw new Error(lastError);
+        }
+      }
+
+      throw new Error(lastError || "Prediction API not found");
+    }
+
+    function normalizeResult(data) {
+      const raw = String(
+        data.prediction || data.raw_prediction || ""
+      ).toUpperCase();
+      const isPneumonia = raw.includes("PNEUMONIA");
+
+      let confidence = data.confidence;
+      if (typeof confidence === "number") {
+        const pct = confidence <= 1 ? confidence * 100 : confidence;
+        confidence = pct.toFixed(1) + "%";
+      } else if (confidence != null && !String(confidence).includes("%")) {
+        confidence = parseFloat(confidence).toFixed(1) + "%";
+      } else {
+        confidence = confidence || "—";
+      }
+
+      return {
+        prediction: isPneumonia ? "Pneumonia" : "Normal",
+        confidence,
+        isPneumonia,
+      };
     }
 
     async function runAnalysis() {
       if (!selectedFile) return;
 
       hideError();
-      resultsPanel.classList.remove("visible");
-      loading.classList.add("visible");
       analyzeBtn.disabled = true;
-      chooseBtn.disabled = true;
+      analyzeBtn.classList.add("loading");
+      analysisPlaceholder.textContent = "Analyzing X-ray... please wait (first run may take 30–60 sec)";
+      analysisPlaceholder.style.display = "block";
+      analysisResult.hidden = true;
 
       const formData = new FormData();
       formData.append("file", selectedFile);
 
       try {
-        const response = await fetch("/api/predict", {
-          method: "POST",
-          body: formData,
+        const data = await postPredict(formData);
+        const result = normalizeResult(data);
+
+        showAnalysisResult(result);
+        addToHistory(result);
+
+        document.getElementById("analysisResult").scrollIntoView({
+          behavior: "smooth",
+          block: "center",
         });
-
-        const data = await response.json();
-
-        if (!response.ok) {
-          throw new Error(data.error || "Analysis failed");
-        }
-
-        const label = data.prediction === "PNEUMONIA" ? "Pneumonia" : "Normal";
-        predictionVal.textContent = label;
-        predictionVal.className =
-          "result-value " + (data.prediction === "PNEUMONIA" ? "pneumonia" : "normal");
-
-        confidenceVal.textContent =
-          (data.confidence * 100).toFixed(1) + "%";
-
-        resultsPanel.classList.add("visible");
       } catch (err) {
+        resetAnalysis();
         showError(
           err.message.includes("Failed to fetch")
-            ? "Start the server: python app.py"
+            ? "Start the server: python app.py then open http://127.0.0.1:5000"
             : err.message
         );
       } finally {
-        loading.classList.remove("visible");
-        analyzeBtn.disabled = false;
-        chooseBtn.disabled = false;
+        analyzeBtn.classList.remove("loading");
+        analyzeBtn.disabled = !selectedFile;
+      }
+    }
+
+    function showAnalysisResult(result) {
+      analysisPlaceholder.style.display = "none";
+      analysisResult.hidden = false;
+
+      predictionLabel.textContent = result.prediction;
+      predictionLabel.className =
+        "prediction-label " + (result.isPneumonia ? "pneumonia" : "normal");
+
+      predictionCircle.classList.toggle("pneumonia", result.isPneumonia);
+
+      predictionDesc.textContent = result.isPneumonia
+        ? "Signs of pneumonia detected."
+        : "No signs of pneumonia detected.";
+
+      confidenceScore.textContent = result.confidence;
+      confidenceScore.className =
+        "confidence-score " + (result.isPneumonia ? "pneumonia" : "normal");
+    }
+
+    function addToHistory(result) {
+      const empty = historyList.querySelector(".history-empty");
+      if (empty) empty.remove();
+
+      const li = document.createElement("li");
+      const time = new Date().toLocaleString();
+      li.textContent = `${time} — ${fileNameEl.textContent}: ${result.prediction} (${result.confidence})`;
+      historyList.prepend(li);
+
+      while (historyList.children.length > 10) {
+        historyList.removeChild(historyList.lastChild);
       }
     }
 
     function showError(msg) {
-      errorMsg.textContent = msg;
-      errorMsg.classList.add("visible");
+      errorBanner.textContent = msg;
+      errorBanner.classList.add("visible");
     }
 
     function hideError() {
-      errorMsg.classList.remove("visible");
+      errorBanner.classList.remove("visible");
     }
   </script>
 </body>
