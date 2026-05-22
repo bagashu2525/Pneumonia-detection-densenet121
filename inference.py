@@ -2,6 +2,8 @@
 # inference.py
 # ============================================
 
+import io
+
 import torch
 import torch.nn as nn
 import torchvision.models as models
@@ -12,193 +14,110 @@ from PIL import Image
 import matplotlib.pyplot as plt
 import numpy as np
 
-from gradcam import (
-    GradCAM,
-    overlay_heatmap
-)
+from gradcam import GradCAM, overlay_heatmap
 
 # ============================================
 # DEVICE
 # ============================================
 
-device = torch.device(
-    "cuda" if torch.cuda.is_available() else "cpu"
-)
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 # ============================================
-# LOAD MODEL
+# MODEL & TRANSFORM (shared by script + web app)
 # ============================================
 
-model = models.densenet121(
-    pretrained=False
-)
-
-# ============================================
-# CUSTOM CLASSIFIER
-# ============================================
+model = models.densenet121(pretrained=False)
 
 model.classifier = nn.Sequential(
-
     nn.Dropout(0.3),
-
     nn.Linear(1024, 1),
-
-    nn.Sigmoid()
+    nn.Sigmoid(),
 )
 
-# ============================================
-# LOAD TRAINED WEIGHTS
-# ============================================
-
 model.load_state_dict(
-    torch.load(
-        "best_pneumonia_model.pth",
-        map_location=device
-    )
+    torch.load("best_pneumonia_model.pth", map_location=device)
 )
 
 model = model.to(device)
-
 model.eval()
 
-print("✅ Model Loaded Successfully")
-
-# ============================================
-# IMAGE TRANSFORM
-# ============================================
-
 transform = transforms.Compose([
-
-    transforms.Grayscale(
-        num_output_channels=3
-    ),
-
+    transforms.Grayscale(num_output_channels=3),
     transforms.Resize((224, 224)),
-
     transforms.ToTensor(),
-
     transforms.Normalize(
         mean=[0.485, 0.456, 0.406],
-        std=[0.229, 0.224, 0.225]
-    )
+        std=[0.229, 0.224, 0.225],
+    ),
 ])
 
-# ============================================
-# LOAD TEST IMAGE
-# ============================================
-
-image_path = "00000002_000.png"
-
-original_image = Image.open(
-    image_path
-).convert("RGB")
-
-# ============================================
-# PREPROCESS IMAGE
-# ============================================
-
-input_tensor = transform(
-    original_image
-)
-
-input_tensor = input_tensor.unsqueeze(0)
-
-input_tensor = input_tensor.to(device)
-
-# ============================================
-# PREDICTION
-# ============================================
-
-with torch.no_grad():
-
-    output = model(input_tensor)
-
-probability = output.item()
-
-prediction = (
-    "PNEUMONIA"
-    if probability > 0.5
-    else "NORMAL"
-)
-
-# ============================================
-# DISPLAY PREDICTION
-# ============================================
-
-print("\n========== RESULT ==========\n")
-
-print(f"Prediction  : {prediction}")
-
-print(f"Confidence  : {probability:.4f}")
-
-# ============================================
-# INITIALIZE GRAD-CAM
-# ============================================
-
 target_layer = model.features[-1]
+gradcam = GradCAM(model, target_layer)
 
-gradcam = GradCAM(
-    model,
-    target_layer
-)
+PREDICTION_THRESHOLD = 0.5
 
-# ============================================
-# GENERATE CAM
-# ============================================
 
-cam = gradcam.generate_cam(
-    input_tensor
-)
+def predict_from_image(image):
+    """Run the same pipeline as this script's CLI flow on a PIL image."""
 
-# ============================================
-# PREPARE IMAGE
-# ============================================
+    original_image = image.convert("RGB")
+    input_tensor = transform(original_image).unsqueeze(0).to(device)
 
-image_np = np.array(
-    original_image.resize((224, 224))
-) / 255.0
+    with torch.no_grad():
+        probability = model(input_tensor).item()
 
-# ============================================
-# CREATE OVERLAY
-# ============================================
+    prediction = (
+        "PNEUMONIA" if probability > PREDICTION_THRESHOLD else "NORMAL"
+    )
+    confidence = (
+        probability if prediction == "PNEUMONIA" else 1.0 - probability
+    )
 
-overlay = overlay_heatmap(
-    cam,
-    image_np
-)
+    cam = gradcam.generate_cam(input_tensor)
+    image_np = np.array(original_image.resize((224, 224))) / 255.0
+    overlay = overlay_heatmap(cam, image_np)
 
-# ============================================
-# VISUALIZATION
-# ============================================
+    return {
+        "prediction": prediction,
+        "confidence": round(confidence, 4),
+        "pneumonia_probability": round(probability, 4),
+        "overlay": overlay,
+        "preview": image_np,
+    }
 
-plt.figure(figsize=(12, 5))
 
-# --------------------------------------------
-# ORIGINAL IMAGE
-# --------------------------------------------
+def predict_from_bytes(image_bytes):
+    image = Image.open(io.BytesIO(image_bytes))
+    return predict_from_image(image)
 
-plt.subplot(1, 2, 1)
 
-plt.imshow(image_np)
+def run_cli(image_path="00000002_000.png"):
+    print("[OK] Model Loaded Successfully")
 
-plt.title("Original X-ray")
+    original_image = Image.open(image_path).convert("RGB")
+    result = predict_from_image(original_image)
 
-plt.axis("off")
+    print("\n========== RESULT ==========\n")
+    print(f"Prediction  : {result['prediction']}")
+    print(f"Confidence  : {result['confidence']:.4f}")
 
-# --------------------------------------------
-# GRAD-CAM
-# --------------------------------------------
+    plt.figure(figsize=(12, 5))
 
-plt.subplot(1, 2, 2)
+    plt.subplot(1, 2, 1)
+    plt.imshow(result["preview"])
+    plt.title("Original X-ray")
+    plt.axis("off")
 
-plt.imshow(overlay)
+    plt.subplot(1, 2, 2)
+    plt.imshow(result["overlay"])
+    plt.title(
+        f"{result['prediction']} ({result['pneumonia_probability']:.2f})"
+    )
+    plt.axis("off")
 
-plt.title(
-    f"{prediction} ({probability:.2f})"
-)
+    plt.tight_layout()
+    plt.show()
 
-plt.axis("off")
 
-plt.tight_layout()
-
-plt.show()
+if __name__ == "__main__":
+    run_cli()
