@@ -4,6 +4,8 @@
 
 import torch
 import numpy as np
+import matplotlib.pyplot as plt
+import seaborn as sns
 
 from sklearn.metrics import (
     accuracy_score,
@@ -11,8 +13,9 @@ from sklearn.metrics import (
     recall_score,
     f1_score,
     confusion_matrix,
-    roc_curve
+    classification_report
 )
+
 
 def evaluate_model(
     model,
@@ -22,8 +25,10 @@ def evaluate_model(
 
     model.eval()
 
-    probabilities = []
-    labels_list = []
+    y_true = []
+    y_pred = []
+
+    confidence_scores = []
 
     with torch.no_grad():
 
@@ -33,58 +38,233 @@ def evaluate_model(
 
             outputs = model(images)
 
-            probs = torch.sigmoid(outputs)
+            # ====================================
+            # SOFTMAX PROBABILITIES
+            # ====================================
 
-            probabilities.extend(
-                probs.cpu().numpy()
+            probabilities = torch.softmax(
+                outputs,
+                dim=1
             )
 
-            labels_list.extend(
+            preds = torch.argmax(
+                probabilities,
+                dim=1
+            )
+
+            confidences = torch.max(
+                probabilities,
+                dim=1
+            )[0]
+
+            confidence_scores.extend(
+                confidences.cpu().numpy()
+            )
+
+            y_true.extend(
                 labels.numpy()
             )
 
-    probabilities = np.array(probabilities).flatten()
-    labels_list = np.array(labels_list).flatten()
+            y_pred.extend(
+                preds.cpu().numpy()
+            )
 
     # ========================================
-    # STANDARD METRICS (THRESHOLD = 0.5)
+    # NUMPY CONVERSION
     # ========================================
 
-    preds_50 = (probabilities > 0.5).astype(float)
-
-    accuracy_50 = accuracy_score(labels_list, preds_50)
-    precision_50 = precision_score(labels_list, preds_50, zero_division=0)
-    recall_50 = recall_score(labels_list, preds_50, zero_division=0)
-    f1_50 = f1_score(labels_list, preds_50, zero_division=0)
-    cm_50 = confusion_matrix(labels_list, preds_50)
+    y_true = np.array(y_true)
+    y_pred = np.array(y_pred)
 
     # ========================================
-    # OPTIMAL THRESHOLD METRICS (ROC YOUDEN'S J)
+    # METRICS
     # ========================================
 
-    fpr, tpr, thresholds = roc_curve(labels_list, probabilities)
-    j_scores = tpr - fpr
-    best_idx = np.argmax(j_scores)
-    optimal_threshold = float(np.clip(thresholds[best_idx], 0.1, 0.9))
+    accuracy = accuracy_score(
+        y_true,
+        y_pred
+    )
 
-    preds_opt = (probabilities > optimal_threshold).astype(float)
+    precision = precision_score(
+        y_true,
+        y_pred,
+        average="weighted",
+        zero_division=0
+    )
 
-    accuracy_opt = accuracy_score(labels_list, preds_opt)
-    precision_opt = precision_score(labels_list, preds_opt, zero_division=0)
-    recall_opt = recall_score(labels_list, preds_opt, zero_division=0)
-    f1_opt = f1_score(labels_list, preds_opt, zero_division=0)
-    cm_opt = confusion_matrix(labels_list, preds_opt)
+    recall = recall_score(
+        y_true,
+        y_pred,
+        average="weighted",
+        zero_division=0
+    )
 
-    print("\n========== TEST RESULTS (THRESHOLD = 0.50) ==========\n")
-    print(f"Accuracy  : {accuracy_50:.4f}")
-    print(f"Precision : {precision_50:.4f}")
-    print(f"Recall    : {recall_50:.4f}")
-    print(f"F1 Score  : {f1_50:.4f}")
-    print("\nConfusion Matrix (0.50):\n", cm_50)
+    f1 = f1_score(
+        y_true,
+        y_pred,
+        average="weighted",
+        zero_division=0
+    )
 
-    print(f"\n========== TEST RESULTS (OPTIMIZED THRESHOLD = {optimal_threshold:.4f}) ==========\n")
-    print(f"Accuracy  : {accuracy_opt:.4f}")
-    print(f"Precision : {precision_opt:.4f}")
-    print(f"Recall    : {recall_opt:.4f}")
-    print(f"F1 Score  : {f1_opt:.4f}")
-    print("\nConfusion Matrix (Optimized):\n", cm_opt)
+    # ========================================
+    # CONFUSION MATRIX
+    # ========================================
+
+    cm = confusion_matrix(
+        y_true,
+        y_pred
+    )
+
+    # ========================================
+    # PRINT RESULTS
+    # ========================================
+
+    print("\n========== TEST RESULTS ==========\n")
+
+    print(f"Accuracy  : {accuracy:.4f}")
+    print(f"Precision : {precision:.4f}")
+    print(f"Recall    : {recall:.4f}")
+    print(f"F1 Score  : {f1:.4f}")
+
+    print("\nConfusion Matrix:\n")
+    print(cm)
+
+    # ========================================
+    # CLASSIFICATION REPORT
+    # ========================================
+
+    report = classification_report(
+        y_true,
+        y_pred,
+        target_names=[
+            "Normal",
+            "Pneumonia",
+            "Tuberculosis"
+        ]
+    )
+
+    print("\n========== CLASSIFICATION REPORT ==========\n")
+
+    print(report)
+
+    # Save report
+
+    with open(
+        "/content/classification_report.txt",
+        "w"
+    ) as f:
+
+        f.write(report)
+
+    # ========================================
+    # CONFUSION MATRIX GRAPH
+    # ========================================
+
+    plt.figure(figsize=(8,6))
+
+    sns.heatmap(
+        cm,
+        annot=True,
+        fmt="d",
+        cmap="Blues",
+        xticklabels=[
+            "Normal",
+            "Pneumonia",
+            "TB"
+        ],
+        yticklabels=[
+            "Normal",
+            "Pneumonia",
+            "TB"
+        ]
+    )
+
+    plt.xlabel("Predicted")
+
+    plt.ylabel("Actual")
+
+    plt.title("Confusion Matrix")
+
+    plt.tight_layout()
+
+    plt.savefig(
+        "/content/confusion_matrix.png"
+    )
+
+    plt.close()
+
+    # ========================================
+    # CONFIDENCE SCORE STATISTICS
+    # ========================================
+
+    avg_confidence = (
+        np.mean(confidence_scores) * 100
+    )
+
+    max_confidence = (
+        np.max(confidence_scores) * 100
+    )
+
+    min_confidence = (
+        np.min(confidence_scores) * 100
+    )
+
+    print("\n========== CONFIDENCE SCORES ==========\n")
+
+    print(
+        f"Average Confidence : "
+        f"{avg_confidence:.2f}%"
+    )
+
+    print(
+        f"Maximum Confidence : "
+        f"{max_confidence:.2f}%"
+    )
+
+    print(
+        f"Minimum Confidence : "
+        f"{min_confidence:.2f}%"
+    )
+
+    # ========================================
+    # CONFIDENCE HISTOGRAM
+    # ========================================
+
+    plt.figure(figsize=(8,5))
+
+    plt.hist(
+        np.array(confidence_scores) * 100,
+        bins=20
+    )
+
+    plt.xlabel("Confidence (%)")
+
+    plt.ylabel("Number of Predictions")
+
+    plt.title(
+        "Prediction Confidence Distribution"
+    )
+
+    plt.tight_layout()
+
+    plt.savefig(
+        "/content/confidence_distribution.png"
+    )
+
+    plt.close()
+
+    print("\n[OK] Saved Files:")
+
+    print("   confusion_matrix.png")
+
+    print("   confidence_distribution.png")
+
+    print("   classification_report.txt")
+
+    return {
+        "accuracy": accuracy,
+        "precision": precision,
+        "recall": recall,
+        "f1": f1,
+        "avg_confidence": avg_confidence
+    }

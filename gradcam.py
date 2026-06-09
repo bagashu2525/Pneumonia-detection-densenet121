@@ -80,7 +80,10 @@ class GradCAM:
         # BACKWARD PASS
         # ------------------------------------
 
-        output.backward()
+        
+        pred_class = output.argmax()
+
+        output[:,pred_class].backward()
 
         # ====================================
         # GET GRADIENTS & ACTIVATIONS

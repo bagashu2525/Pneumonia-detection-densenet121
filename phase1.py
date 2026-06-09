@@ -72,17 +72,17 @@ val_transform = transforms.Compose([
 # ============================================
 
 train_dataset = datasets.ImageFolder(
-    "dataset/train",
+    "/content/combined/train",
     transform=train_transform
 )
 
 val_dataset = datasets.ImageFolder(
-    "dataset/val",
+    "/content/combined/val",
     transform=val_transform
 )
 
 test_dataset = datasets.ImageFolder(
-    "dataset/test",
+    "/content/combined/test",
     transform=val_transform
 )
 
@@ -145,3 +145,12 @@ test_loader = DataLoader(
 )
 
 print("\n[OK] Phase 1 Loaded Successfully")
+print(train_dataset.class_to_idx)
+
+# Expected
+
+{
+    "Normal":0,
+    "Pneumonia":1,
+    "Tuberculosis":2
+}

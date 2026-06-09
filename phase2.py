@@ -47,10 +47,11 @@ for param in model.features.denseblock4.parameters():
 # ============================================
 
 model.classifier = nn.Sequential(
-
+    nn.Dropout(0.4),
+    nn.Linear(1024,512),
+    nn.ReLU(),
     nn.Dropout(0.3),
-
-    nn.Linear(1024, 1)
+    nn.Linear(512,3)
 )
 
 # ============================================
@@ -74,7 +75,8 @@ model = model.to(device)
 # Balance class weight to penalize False Positives more heavily
 # Ratio of Normal (1341) to Pneumonia (3875) = 1341/3875 ≈ 0.35
 pos_weight = torch.tensor([0.35]).to(device)
-criterion = nn.BCEWithLogitsLoss(pos_weight=pos_weight)
+#criterion = nn.BCEWithLogitsLoss(pos_weight=pos_weight)
+criterion = nn.CrossEntropyLoss(pos_weight=pos_weight)
 
 # ============================================
 # OPTIMIZER
