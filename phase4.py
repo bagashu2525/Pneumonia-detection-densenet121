@@ -13,8 +13,11 @@ from sklearn.metrics import (
     recall_score,
     f1_score,
     confusion_matrix,
-    classification_report
+    classification_report,
+    roc_auc_score
 )
+
+from sklearn.preprocessing import label_binarize
 
 
 def evaluate_model(
@@ -29,6 +32,11 @@ def evaluate_model(
     y_pred = []
 
     confidence_scores = []
+    all_probabilities = []
+
+    # ========================================
+    # INFERENCE
+    # ========================================
 
     with torch.no_grad():
 
@@ -37,10 +45,6 @@ def evaluate_model(
             images = images.to(device)
 
             outputs = model(images)
-
-            # ====================================
-            # SOFTMAX PROBABILITIES
-            # ====================================
 
             probabilities = torch.softmax(
                 outputs,
@@ -61,6 +65,10 @@ def evaluate_model(
                 confidences.cpu().numpy()
             )
 
+            all_probabilities.extend(
+                probabilities.cpu().numpy()
+            )
+
             y_true.extend(
                 labels.numpy()
             )
@@ -70,11 +78,15 @@ def evaluate_model(
             )
 
     # ========================================
-    # NUMPY CONVERSION
+    # CONVERT TO NUMPY
     # ========================================
 
     y_true = np.array(y_true)
     y_pred = np.array(y_pred)
+
+    all_probabilities = np.array(
+        all_probabilities
+    )
 
     # ========================================
     # METRICS
@@ -107,6 +119,27 @@ def evaluate_model(
     )
 
     # ========================================
+    # MULTICLASS ROC-AUC
+    # ========================================
+
+    try:
+
+        y_true_bin = label_binarize(
+            y_true,
+            classes=[0, 1, 2]
+        )
+
+        roc_auc = roc_auc_score(
+            y_true_bin,
+            all_probabilities,
+            multi_class="ovr"
+        )
+
+    except:
+
+        roc_auc = 0.0
+
+    # ========================================
     # CONFUSION MATRIX
     # ========================================
 
@@ -114,20 +147,6 @@ def evaluate_model(
         y_true,
         y_pred
     )
-
-    # ========================================
-    # PRINT RESULTS
-    # ========================================
-
-    print("\n========== TEST RESULTS ==========\n")
-
-    print(f"Accuracy  : {accuracy:.4f}")
-    print(f"Precision : {precision:.4f}")
-    print(f"Recall    : {recall:.4f}")
-    print(f"F1 Score  : {f1:.4f}")
-
-    print("\nConfusion Matrix:\n")
-    print(cm)
 
     # ========================================
     # CLASSIFICATION REPORT
@@ -143,24 +162,23 @@ def evaluate_model(
         ]
     )
 
-    print("\n========== CLASSIFICATION REPORT ==========\n")
-
-    print(report)
-
-    # Save report
+    # ========================================
+    # SAVE REPORT
+    # ========================================
 
     with open(
-        "/content/classification_report.txt",
-        "w"
+        "classification_report.txt",
+        "w",
+        encoding="utf-8"
     ) as f:
 
         f.write(report)
 
     # ========================================
-    # CONFUSION MATRIX GRAPH
+    # CONFUSION MATRIX PLOT
     # ========================================
 
-    plt.figure(figsize=(8,6))
+    plt.figure(figsize=(8, 6))
 
     sns.heatmap(
         cm,
@@ -180,25 +198,31 @@ def evaluate_model(
     )
 
     plt.xlabel("Predicted")
-
     plt.ylabel("Actual")
-
     plt.title("Confusion Matrix")
 
     plt.tight_layout()
 
     plt.savefig(
-        "/content/confusion_matrix.png"
+        "confusion_matrix.png"
     )
 
     plt.close()
 
     # ========================================
-    # CONFIDENCE SCORE STATISTICS
+    # CONFIDENCE STATISTICS
     # ========================================
+
+    confidence_scores = np.array(
+        confidence_scores
+    )
 
     avg_confidence = (
         np.mean(confidence_scores) * 100
+    )
+
+    std_confidence = (
+        np.std(confidence_scores) * 100
     )
 
     max_confidence = (
@@ -209,11 +233,77 @@ def evaluate_model(
         np.min(confidence_scores) * 100
     )
 
-    print("\n========== CONFIDENCE SCORES ==========\n")
+    # ========================================
+    # CONFIDENCE HISTOGRAM
+    # ========================================
+
+    plt.figure(figsize=(8, 5))
+
+    plt.hist(
+        confidence_scores * 100,
+        bins=20
+    )
+
+    plt.xlabel(
+        "Confidence (%)"
+    )
+
+    plt.ylabel(
+        "Number of Predictions"
+    )
+
+    plt.title(
+        "Prediction Confidence Distribution"
+    )
+
+    plt.tight_layout()
+
+    plt.savefig(
+        "confidence_distribution.png"
+    )
+
+    plt.close()
+
+    # ========================================
+    # PRINT RESULTS
+    # ========================================
+
+    print("\n" + "=" * 60)
+    print("TEST RESULTS")
+    print("=" * 60)
+
+    print(
+        f"Accuracy  : {accuracy:.4f}"
+    )
+
+    print(
+        f"Precision : {precision:.4f}"
+    )
+
+    print(
+        f"Recall    : {recall:.4f}"
+    )
+
+    print(
+        f"F1 Score  : {f1:.4f}"
+    )
+
+    print(
+        f"ROC-AUC   : {roc_auc:.4f}"
+    )
+
+    print("\n" + "=" * 60)
+    print("CONFIDENCE ANALYSIS")
+    print("=" * 60)
 
     print(
         f"Average Confidence : "
         f"{avg_confidence:.2f}%"
+    )
+
+    print(
+        f"Std Confidence     : "
+        f"{std_confidence:.2f}%"
     )
 
     print(
@@ -226,45 +316,51 @@ def evaluate_model(
         f"{min_confidence:.2f}%"
     )
 
+    print("\n" + "=" * 60)
+    print("CLASSIFICATION REPORT")
+    print("=" * 60)
+
+    print(report)
+
+    print("\nGenerated Files:")
+
+    print(
+        "✓ confusion_matrix.png"
+    )
+
+    print(
+        "✓ confidence_distribution.png"
+    )
+
+    print(
+        "✓ classification_report.txt"
+    )
+
     # ========================================
-    # CONFIDENCE HISTOGRAM
+    # RETURN RESULTS
     # ========================================
-
-    plt.figure(figsize=(8,5))
-
-    plt.hist(
-        np.array(confidence_scores) * 100,
-        bins=20
-    )
-
-    plt.xlabel("Confidence (%)")
-
-    plt.ylabel("Number of Predictions")
-
-    plt.title(
-        "Prediction Confidence Distribution"
-    )
-
-    plt.tight_layout()
-
-    plt.savefig(
-        "/content/confidence_distribution.png"
-    )
-
-    plt.close()
-
-    print("\n[OK] Saved Files:")
-
-    print("   confusion_matrix.png")
-
-    print("   confidence_distribution.png")
-
-    print("   classification_report.txt")
 
     return {
+
         "accuracy": accuracy,
+
         "precision": precision,
+
         "recall": recall,
+
         "f1": f1,
-        "avg_confidence": avg_confidence
+
+        "roc_auc": roc_auc,
+
+        "avg_confidence":
+            avg_confidence,
+
+        "std_confidence":
+            std_confidence,
+
+        "confusion_matrix":
+            cm,
+
+        "classification_report":
+            report
     }
