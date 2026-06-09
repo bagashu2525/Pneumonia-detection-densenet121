@@ -61,4 +61,4 @@ evaluate_model(
     device=device
 )
 
-print("\n✅ COMPLETE PIPELINE FINISHED")
+print("\n[SUCCESS] COMPLETE PIPELINE FINISHED")

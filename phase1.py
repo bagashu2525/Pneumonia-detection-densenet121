@@ -1,24 +1,43 @@
 # ============================================
 # PHASE 1 : DATA PREPROCESSING & LOADING
+# phase1.py
 # ============================================
 
 import torch
+import numpy as np
+
 from torchvision import datasets, transforms
-from torch.utils.data import DataLoader
+
+from torch.utils.data import (
+    DataLoader,
+    WeightedRandomSampler
+)
 
 # ============================================
-# TRANSFORMS
+# TRAIN TRANSFORMS
 # ============================================
 
 train_transform = transforms.Compose([
 
-    transforms.Grayscale(num_output_channels=3),
+    transforms.Grayscale(
+        num_output_channels=3
+    ),
 
     transforms.Resize((224, 224)),
 
     transforms.RandomHorizontalFlip(),
 
-    transforms.RandomRotation(10),
+    transforms.RandomRotation(15),
+
+    transforms.RandomAffine(
+        degrees=0,
+        translate=(0.05, 0.05)
+    ),
+
+    transforms.ColorJitter(
+        brightness=0.1,
+        contrast=0.1
+    ),
 
     transforms.ToTensor(),
 
@@ -28,9 +47,15 @@ train_transform = transforms.Compose([
     )
 ])
 
+# ============================================
+# VALIDATION / TEST TRANSFORMS
+# ============================================
+
 val_transform = transforms.Compose([
 
-    transforms.Grayscale(num_output_channels=3),
+    transforms.Grayscale(
+        num_output_channels=3
+    ),
 
     transforms.Resize((224, 224)),
 
@@ -62,25 +87,61 @@ test_dataset = datasets.ImageFolder(
 )
 
 # ============================================
+# CLASS LABELS
+# ============================================
+
+print("\nClass Mapping:")
+
+print(train_dataset.class_to_idx)
+
+# ============================================
+# BALANCED SAMPLER
+# ============================================
+
+targets = train_dataset.targets
+
+class_counts = np.bincount(targets)
+
+print("\nClass Counts:")
+
+print(class_counts)
+
+class_weights = 1. / class_counts
+
+sample_weights = [
+    class_weights[t]
+    for t in targets
+]
+
+sampler = WeightedRandomSampler(
+    sample_weights,
+    num_samples=len(sample_weights),
+    replacement=True
+)
+
+# ============================================
 # DATALOADERS
 # ============================================
 
 train_loader = DataLoader(
     train_dataset,
     batch_size=16,
-    shuffle=True
+    sampler=sampler,
+    num_workers=2
 )
 
 val_loader = DataLoader(
     val_dataset,
     batch_size=16,
-    shuffle=False
+    shuffle=False,
+    num_workers=2
 )
 
 test_loader = DataLoader(
     test_dataset,
     batch_size=16,
-    shuffle=False
+    shuffle=False,
+    num_workers=2
 )
 
-print("✅ Phase 1 Loaded")
+print("\n[OK] Phase 1 Loaded Successfully")

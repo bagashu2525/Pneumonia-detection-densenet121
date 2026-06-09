@@ -25,34 +25,36 @@ device = torch.device(
     "cuda" if torch.cuda.is_available() else "cpu"
 )
 
+print("\nUsing Device:", device)
+
 # ============================================
 # LOAD MODEL
 # ============================================
 
 model = models.densenet121(
-    pretrained=False
+    weights=None
 )
 
 # ============================================
-# CUSTOM CLASSIFIER
+# CLASSIFIER
+# IMPORTANT:
+# NO SIGMOID HERE
 # ============================================
 
 model.classifier = nn.Sequential(
 
     nn.Dropout(0.3),
 
-    nn.Linear(1024, 1),
-
-    nn.Sigmoid()
+    nn.Linear(1024, 1)
 )
 
 # ============================================
-# LOAD TRAINED WEIGHTS
+# LOAD WEIGHTS
 # ============================================
 
 model.load_state_dict(
     torch.load(
-        "best_pneumonia_model.pth",
+        "best_pneumonia_model (1).pth",
         map_location=device
     )
 )
@@ -61,7 +63,7 @@ model = model.to(device)
 
 model.eval()
 
-print("✅ Model Loaded Successfully")
+print("[OK] Model Loaded Successfully")
 
 # ============================================
 # IMAGE TRANSFORM
@@ -84,10 +86,10 @@ transform = transforms.Compose([
 ])
 
 # ============================================
-# LOAD TEST IMAGE
+# LOAD IMAGE
 # ============================================
 
-image_path = "00000002_000.png"
+image_path = "images\\person101_bacteria_484.jpeg"
 
 original_image = Image.open(
     image_path
@@ -113,53 +115,60 @@ with torch.no_grad():
 
     output = model(input_tensor)
 
-probability = output.item()
+    probability = torch.sigmoid(
+        output
+    ).item()
+
+# ============================================
+# THRESHOLD
+# ============================================
+
+# Tuned to 0.70 to balance precision and reduce False Positives on normal adult scans
+threshold = 0.70
 
 prediction = (
     "PNEUMONIA"
-    if probability > 0.5
+    if probability > threshold
     else "NORMAL"
 )
 
 # ============================================
-# DISPLAY PREDICTION
+# PRINT RESULTS
 # ============================================
 
 print("\n========== RESULT ==========\n")
 
-print(f"Prediction  : {prediction}")
+print(f"Prediction : {prediction}")
 
-print(f"Confidence  : {probability:.4f}")
+print(f"Confidence : {probability:.4f}")
 
 # ============================================
-# INITIALIZE GRAD-CAM
+# GRAD-CAM
 # ============================================
 
-target_layer = model.features[-1]
+target_layer = model.features.denseblock4
 
 gradcam = GradCAM(
     model,
     target_layer
 )
 
-# ============================================
-# GENERATE CAM
-# ============================================
-
 cam = gradcam.generate_cam(
     input_tensor
 )
 
 # ============================================
-# PREPARE IMAGE
+# IMAGE FOR DISPLAY
 # ============================================
 
 image_np = np.array(
+
     original_image.resize((224, 224))
+
 ) / 255.0
 
 # ============================================
-# CREATE OVERLAY
+# OVERLAY
 # ============================================
 
 overlay = overlay_heatmap(
@@ -186,7 +195,7 @@ plt.title("Original X-ray")
 plt.axis("off")
 
 # --------------------------------------------
-# GRAD-CAM
+# GRAD-CAM RESULT
 # --------------------------------------------
 
 plt.subplot(1, 2, 2)
@@ -201,4 +210,7 @@ plt.axis("off")
 
 plt.tight_layout()
 
-plt.show()
+# Save the visualization to a file to prevent GUI blocking in non-interactive/headless environments
+output_path = "gradcam_result.png"
+plt.savefig(output_path, dpi=300)
+print(f"[OK] Grad-CAM Visualization saved to: {output_path}")

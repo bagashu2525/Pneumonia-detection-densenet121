@@ -28,7 +28,7 @@ class GradCAM:
             self.forward_hook
         )
 
-        self.target_layer.register_backward_hook(
+        self.target_layer.register_full_backward_hook(
             self.backward_hook
         )
 

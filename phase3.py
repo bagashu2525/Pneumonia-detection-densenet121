@@ -85,10 +85,10 @@ def train_model(
             best_loss = val_loss
 
             torch.save(
-                model.state_dict(),
-                "best_pneumonia_model.pth"
-            )
+    model.state_dict(),
+    "/content/best_pneumonia_model.pth"
+)
 
-            print("✅ Best Model Saved")
+            print("[OK] Best Model Saved")
 
-    print("\n✅ Training Finished")
+    print("\n[SUCCESS] Training Finished")
