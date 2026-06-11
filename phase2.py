@@ -8,6 +8,8 @@ import torch.nn as nn
 import torchvision.models as models
 import torch.optim as optim
 
+from torchvision.models import DenseNet121_Weights
+
 # ============================================
 # DEVICE
 # ============================================
@@ -19,28 +21,41 @@ device = torch.device(
 print("\nUsing Device:", device)
 
 # ============================================
-# LOAD DENSENET121
+# LOAD PRETRAINED DENSENET121
 # ============================================
 
 model = models.densenet121(
-    pretrained=True
+    weights=DenseNet121_Weights.DEFAULT
 )
+
+print("[INFO] DenseNet121 Loaded")
 
 # ============================================
 # FREEZE ALL PARAMETERS
 # ============================================
 
 for param in model.parameters():
-
     param.requires_grad = False
 
+print("[INFO] All Layers Frozen")
+
 # ============================================
-# UNFREEZE LAST DENSE BLOCK
+# UNFREEZE DENSEBLOCK 3
+# ============================================
+
+for param in model.features.denseblock3.parameters():
+    param.requires_grad = True
+
+print("[INFO] DenseBlock3 Unfrozen")
+
+# ============================================
+# UNFREEZE DENSEBLOCK 4
 # ============================================
 
 for param in model.features.denseblock4.parameters():
-
     param.requires_grad = True
+
+print("[INFO] DenseBlock4 Unfrozen")
 
 # ============================================
 # CUSTOM CLASSIFIER
@@ -48,9 +63,21 @@ for param in model.features.denseblock4.parameters():
 
 model.classifier = nn.Sequential(
 
-    nn.Dropout(0.3),
+    nn.Linear(
+        in_features=1024,
+        out_features=512
+    ),
 
-    nn.Linear(1024, 1)
+    nn.BatchNorm1d(512),
+
+    nn.ReLU(inplace=True),
+
+    nn.Dropout(0.5),
+
+    nn.Linear(
+        in_features=512,
+        out_features=1
+    )
 )
 
 # ============================================
@@ -58,11 +85,12 @@ model.classifier = nn.Sequential(
 # ============================================
 
 for param in model.classifier.parameters():
-
     param.requires_grad = True
 
+print("[INFO] Custom Classifier Added")
+
 # ============================================
-# MOVE TO DEVICE
+# MOVE MODEL TO DEVICE
 # ============================================
 
 model = model.to(device)
@@ -71,10 +99,11 @@ model = model.to(device)
 # LOSS FUNCTION
 # ============================================
 
-# Balance class weight to penalize False Positives more heavily
-# Ratio of Normal (1341) to Pneumonia (3875) = 1341/3875 ≈ 0.35
-pos_weight = torch.tensor([0.35]).to(device)
-criterion = nn.BCEWithLogitsLoss(pos_weight=pos_weight)
+# Binary Classification:
+# 0 = Normal
+# 1 = Pneumonia
+
+criterion = nn.BCEWithLogitsLoss()
 
 # ============================================
 # OPTIMIZER
@@ -87,7 +116,48 @@ optimizer = optim.Adam(
         model.parameters()
     ),
 
-    lr=1e-5
+    lr=1e-5,
+
+    weight_decay=1e-4
 )
 
-print("[OK] Phase 2 Loaded Successfully")
+# ============================================
+# LEARNING RATE SCHEDULER
+# ============================================
+
+scheduler = optim.lr_scheduler.ReduceLROnPlateau(
+
+    optimizer,
+
+    mode='min',
+
+    factor=0.5,
+
+    patience=2,
+
+    min_lr=1e-7
+)
+
+# ============================================
+# TRAINABLE PARAMETER COUNT
+# ============================================
+
+trainable_params = sum(
+    p.numel()
+    for p in model.parameters()
+    if p.requires_grad
+)
+
+total_params = sum(
+    p.numel()
+    for p in model.parameters()
+)
+
+print("\n===================================")
+print("MODEL SUMMARY")
+print("===================================")
+print(f"Total Parameters     : {total_params:,}")
+print(f"Trainable Parameters : {trainable_params:,}")
+print("===================================")
+
+print("\n[OK] Phase 2 Loaded Successfully")
