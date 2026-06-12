@@ -1,0 +1,6 @@
+PNEUMONIA DETECTION REPORT
+
+Prediction: PNEUMONIA
+Confidence: 99.87%
+Inference Time: 339.53 ms
+Threshold Used: 0.5

@@ -7,12 +7,16 @@ import cv2
 import numpy as np
 
 # ============================================
-# GRAD-CAM CLASS
+# GRAD-CAM
 # ============================================
 
 class GradCAM:
 
-    def __init__(self, model, target_layer):
+    def __init__(
+        self,
+        model,
+        target_layer
+    ):
 
         self.model = model
         self.target_layer = target_layer
@@ -21,15 +25,19 @@ class GradCAM:
         self.activations = None
 
         # ------------------------------------
-        # REGISTER HOOKS
+        # HOOKS
         # ------------------------------------
 
-        self.target_layer.register_forward_hook(
-            self.forward_hook
+        self.forward_handle = (
+            self.target_layer.register_forward_hook(
+                self.forward_hook
+            )
         )
 
-        self.target_layer.register_full_backward_hook(
-            self.backward_hook
+        self.backward_handle = (
+            self.target_layer.register_full_backward_hook(
+                self.backward_hook
+            )
         )
 
     # ========================================
@@ -43,7 +51,9 @@ class GradCAM:
         output
     ):
 
-        self.activations = output
+        self.activations = (
+            output.clone().detach()
+        )
 
     # ========================================
     # BACKWARD HOOK
@@ -56,120 +66,256 @@ class GradCAM:
         grad_output
     ):
 
-        self.gradients = grad_output[0]
+        self.gradients = (
+            grad_output[0].clone().detach()
+        )
 
     # ========================================
     # GENERATE CAM
     # ========================================
 
-    def generate_cam(self, input_tensor):
+    def generate_cam(
+        self,
+        input_tensor
+    ):
+
+        self.model.eval()
+
+        self.gradients = None
+        self.activations = None
 
         # ------------------------------------
-        # FORWARD PASS
+        # FORWARD
         # ------------------------------------
 
-        output = self.model(input_tensor)
+        output = self.model(
+            input_tensor
+        )
+
+        confidence = torch.sigmoid(
+            output
+        ).item()
+
+        prediction = int(
+            confidence > 0.5
+        )
 
         # ------------------------------------
-        # CLEAR OLD GRADIENTS
+        # BACKWARD
         # ------------------------------------
 
         self.model.zero_grad()
 
+        score = output[:, 0]
+
+        score.backward(
+            torch.ones_like(score)
+        )
+
         # ------------------------------------
-        # BACKWARD PASS
+        # CHECK HOOKS
         # ------------------------------------
 
-        output.backward()
+        if self.gradients is None:
 
-        # ====================================
-        # GET GRADIENTS & ACTIVATIONS
-        # ====================================
+            raise RuntimeError(
+                "GradCAM gradients are None. "
+                "Check target layer."
+            )
+
+        if self.activations is None:
+
+            raise RuntimeError(
+                "GradCAM activations are None. "
+                "Check target layer."
+            )
+
+        # ------------------------------------
+        # FEATURES
+        # ------------------------------------
 
         gradients = self.gradients[0]
 
         activations = self.activations[0]
 
-        # ====================================
-        # GLOBAL AVERAGE POOLING
-        # ====================================
+        # ------------------------------------
+        # GLOBAL AVG POOLING
+        # ------------------------------------
 
         weights = torch.mean(
+
             gradients,
-            dim=[1, 2]
+
+            dim=(1, 2)
         )
 
-        # ====================================
-        # CREATE EMPTY CAM
-        # ====================================
+        # ------------------------------------
+        # CAM
+        # ------------------------------------
 
         cam = torch.zeros(
+
             activations.shape[1:],
-            dtype=torch.float32
-        ).to(input_tensor.device)
 
-        # ====================================
-        # WEIGHTED COMBINATION
-        # ====================================
+            dtype=torch.float32,
 
-        for i, w in enumerate(weights):
+            device=activations.device
+        )
 
-            cam += w * activations[i]
+        for i, weight in enumerate(weights):
 
-        # ====================================
-        # APPLY ReLU
-        # ====================================
+            cam += (
 
-        cam = torch.relu(cam)
+                weight *
 
-        # ====================================
-        # NORMALIZE
-        # ====================================
+                activations[i]
+            )
 
-        cam -= cam.min()
+        # ------------------------------------
+        # RELU
+        # ------------------------------------
 
-        cam /= cam.max()
+        cam = torch.relu(
+            cam
+        )
 
-        cam = cam.detach().cpu().numpy()
+        # ------------------------------------
+        # NORMALIZATION
+        # ------------------------------------
 
-        return cam
+        cam_min = cam.min()
+
+        cam_max = cam.max()
+
+        if (cam_max - cam_min) > 1e-8:
+
+            cam = (
+
+                cam - cam_min
+
+            ) / (
+
+                cam_max - cam_min
+            )
+
+        else:
+
+            cam = torch.zeros_like(
+                cam
+            )
+
+        cam = cam.cpu().numpy()
+
+        return (
+
+            cam,
+
+            prediction,
+
+            confidence
+        )
+
+    # ========================================
+    # REMOVE HOOKS
+    # ========================================
+
+    def remove_hooks(self):
+
+        if self.forward_handle:
+
+            self.forward_handle.remove()
+
+        if self.backward_handle:
+
+            self.backward_handle.remove()
+
 
 # ============================================
-# OVERLAY HEATMAP FUNCTION
+# OVERLAY HEATMAP
 # ============================================
 
 def overlay_heatmap(
+
     cam,
+
     image,
-    alpha=0.4
+
+    alpha=0.55
+
 ):
 
-    # ========================================
-    # RESIZE CAM
-    # ========================================
-
     cam = cv2.resize(
+
         cam,
-        (image.shape[1], image.shape[0])
+
+        (
+            image.shape[1],
+            image.shape[0]
+        )
     )
 
-    # ========================================
-    # CREATE HEATMAP
-    # ========================================
-
+    
     heatmap = cv2.applyColorMap(
-        np.uint8(255 * cam),
-        cv2.COLORMAP_JET
+    np.uint8(255 * cam),
+    cv2.COLORMAP_JET
     )
 
-    heatmap = np.float32(heatmap) / 255
+    heatmap = (
+        heatmap.astype(
+            np.float32
+        )
+        / 255.0
+    )
 
-    # ========================================
-    # COMBINE WITH ORIGINAL IMAGE
-    # ========================================
+    image = image.astype(
+        np.float32
+    )
 
-    overlay = heatmap * alpha + image
+    if image.max() > 1:
 
-    overlay = overlay / overlay.max()
+        image /= 255.0
+
+    overlay = (
+
+        alpha * heatmap +
+
+        (1 - alpha) * image
+    )
+
+    overlay = np.clip(
+
+        overlay,
+
+        0,
+
+        1
+    )
 
     return overlay
+
+
+# ============================================
+# SAVE GRADCAM
+# ============================================
+
+def save_gradcam(
+
+    overlay,
+
+    save_path
+
+):
+
+    cv2.imwrite(
+
+        save_path,
+
+        np.uint8(
+            overlay * 255
+        )
+    )
+
+    print(
+        f"[OK] Saved GradCAM: "
+        f"{save_path}"
+    )

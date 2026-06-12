@@ -35,7 +35,7 @@ model.classifier = nn.Sequential(
 )
 
 model.load_state_dict(
-    torch.load("best_pneumonia_model (1).pth", map_location=device)
+    torch.load("best_pneumonia_model (2).pth", map_location=device)
 )
 
 model = model.to(device)
