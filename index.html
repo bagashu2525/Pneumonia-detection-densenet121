@@ -334,6 +334,88 @@
 
     .confidence-score.pneumonia { color: var(--red); }
 
+    .confidence-details {
+      width: 100%;
+      margin-top: 1rem;
+      padding: 1rem;
+      background: #f8fafc;
+      border-radius: 12px;
+    }
+
+    .conf-row {
+      display: flex;
+      justify-content: space-between;
+      padding: 0.4rem 0;
+      font-size: 0.95rem;
+      color: #475569;
+    }
+
+    .conf-row span:last-child {
+      font-weight: 700;
+      color: var(--navy);
+    }
+
+    .conf-row.pneumonia span:last-child { color: var(--red); }
+    .conf-row.normal span:last-child { color: var(--green); }
+
+    /* ========== GRAD-CAM ========== */
+    .gradcam-section {
+      margin-bottom: 2rem;
+    }
+
+    .gradcam-section[hidden] {
+      display: none !important;
+    }
+
+    .gradcam-card {
+      background: #fff;
+      border-radius: 20px;
+      padding: 24px;
+      box-shadow: 0 5px 20px rgba(0, 0, 0, 0.06);
+    }
+
+    .gradcam-card h3 {
+      font-size: 1.15rem;
+      margin-bottom: 0.35rem;
+      color: #334155;
+    }
+
+    .gradcam-card .sub {
+      font-size: 0.9rem;
+      color: var(--gray);
+      margin-bottom: 1.25rem;
+    }
+
+    .gradcam-images {
+      display: flex;
+      gap: 24px;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+
+    .gradcam-images figure {
+      text-align: center;
+      flex: 1;
+      min-width: 220px;
+      max-width: 320px;
+    }
+
+    .gradcam-images img {
+      width: 100%;
+      height: 280px;
+      object-fit: cover;
+      border-radius: 12px;
+      border: 2px solid #e2e8f0;
+      background: #f8fafc;
+    }
+
+    .gradcam-images figcaption {
+      margin-top: 0.5rem;
+      font-size: 0.9rem;
+      color: var(--gray);
+      font-weight: 600;
+    }
+
     .info-box {
       margin-top: 1.25rem;
       padding: 1rem 1.25rem;
@@ -639,6 +721,16 @@
               <div class="label">Confidence Score</div>
               <div class="confidence-score" id="confidenceScore">—</div>
             </div>
+            <div class="confidence-details">
+              <div class="conf-row pneumonia">
+                <span>Pneumonia probability</span>
+                <span id="pneumoniaProb">—</span>
+              </div>
+              <div class="conf-row normal">
+                <span>Normal probability</span>
+                <span id="normalProb">—</span>
+              </div>
+            </div>
             <div class="info-box">
               <strong>Result Information</strong>
               This AI analysis is for informational purposes only
@@ -648,6 +740,24 @@
         </div>
       </div>
     </div>
+
+    <!-- GRAD-CAM -->
+    <section class="gradcam-section" id="gradcamSection" hidden>
+      <div class="gradcam-card">
+        <h3>Grad-CAM Visualization</h3>
+        <p class="sub">Heatmap highlights regions the DenseNet121 model focused on during prediction.</p>
+        <div class="gradcam-images">
+          <figure>
+            <img id="gradcamOriginal" src="" alt="Model input X-ray">
+            <figcaption>Original (224×224)</figcaption>
+          </figure>
+          <figure>
+            <img id="gradcamOverlay" src="" alt="Grad-CAM heatmap overlay">
+            <figcaption>Grad-CAM overlay</figcaption>
+          </figure>
+        </div>
+      </div>
+    </section>
 
     <!-- FEATURES -->
     <div class="features">
@@ -729,6 +839,11 @@
     const predictionLabel = document.getElementById("predictionLabel");
     const predictionDesc = document.getElementById("predictionDesc");
     const confidenceScore = document.getElementById("confidenceScore");
+    const pneumoniaProb = document.getElementById("pneumoniaProb");
+    const normalProb = document.getElementById("normalProb");
+    const gradcamSection = document.getElementById("gradcamSection");
+    const gradcamOriginal = document.getElementById("gradcamOriginal");
+    const gradcamOverlay = document.getElementById("gradcamOverlay");
     const historyList = document.getElementById("historyList");
 
     let selectedFile = null;
@@ -808,6 +923,7 @@
       fileNameEl.textContent = "—";
       resultsRow.classList.remove("visible");
       analyzeBtn.disabled = true;
+      gradcamSection.hidden = true;
       resetAnalysis();
     }
 
@@ -816,6 +932,7 @@
         'Click "Analyze X-ray" to run AI detection';
       analysisPlaceholder.style.display = "block";
       analysisResult.hidden = true;
+      gradcamSection.hidden = true;
     }
 
     async function parseJsonResponse(response) {
@@ -858,12 +975,30 @@
       ).toUpperCase();
       const isPneumonia = raw.includes("PNEUMONIA");
 
+      let pneumoniaPct = data.pneumonia_probability;
+      if (typeof pneumoniaPct === "number" && pneumoniaPct <= 1) {
+        pneumoniaPct = pneumoniaPct * 100;
+      } else if (pneumoniaPct != null) {
+        pneumoniaPct = parseFloat(pneumoniaPct);
+      }
+
+      let normalPct = data.normal_probability;
+      if (typeof normalPct === "number" && normalPct <= 1) {
+        normalPct = normalPct * 100;
+      } else if (normalPct != null) {
+        normalPct = parseFloat(normalPct);
+      } else if (pneumoniaPct != null) {
+        normalPct = 100 - pneumoniaPct;
+      }
+
       let confidence = data.confidence;
       if (typeof confidence === "number") {
         const pct = confidence <= 1 ? confidence * 100 : confidence;
         confidence = pct.toFixed(1) + "%";
       } else if (confidence != null && !String(confidence).includes("%")) {
         confidence = parseFloat(confidence).toFixed(1) + "%";
+      } else if (data.confidence_value != null) {
+        confidence = parseFloat(data.confidence_value).toFixed(1) + "%";
       } else {
         confidence = confidence || "—";
       }
@@ -871,7 +1006,11 @@
       return {
         prediction: isPneumonia ? "Pneumonia" : "Normal",
         confidence,
+        pneumoniaPct: pneumoniaPct != null ? pneumoniaPct.toFixed(1) + "%" : "—",
+        normalPct: normalPct != null ? normalPct.toFixed(1) + "%" : "—",
         isPneumonia,
+        gradcamImage: data.gradcam_image || null,
+        originalImage: data.original_image || null,
       };
     }
 
@@ -884,6 +1023,7 @@
       analysisPlaceholder.textContent = "Analyzing X-ray... please wait (first run may take 30–60 sec)";
       analysisPlaceholder.style.display = "block";
       analysisResult.hidden = true;
+      gradcamSection.hidden = true;
 
       const formData = new FormData();
       formData.append("file", selectedFile);
@@ -895,7 +1035,7 @@
         showAnalysisResult(result);
         addToHistory(result);
 
-        document.getElementById("analysisResult").scrollIntoView({
+        gradcamSection.scrollIntoView({
           behavior: "smooth",
           block: "center",
         });
@@ -929,6 +1069,17 @@
       confidenceScore.textContent = result.confidence;
       confidenceScore.className =
         "confidence-score " + (result.isPneumonia ? "pneumonia" : "normal");
+
+      pneumoniaProb.textContent = result.pneumoniaPct;
+      normalProb.textContent = result.normalPct;
+
+      if (result.gradcamImage && result.originalImage) {
+        gradcamOriginal.src = "data:image/png;base64," + result.originalImage;
+        gradcamOverlay.src = "data:image/png;base64," + result.gradcamImage;
+        gradcamSection.hidden = false;
+      } else {
+        gradcamSection.hidden = true;
+      }
     }
 
     function addToHistory(result) {

@@ -1,6 +1,10 @@
+import base64
+import io
 from pathlib import Path
 
+import numpy as np
 from flask import Flask, jsonify, request, send_from_directory
+from PIL import Image
 
 from inference import predict_from_bytes
 
@@ -9,6 +13,13 @@ ALLOWED_EXTENSIONS = {".png", ".jpg", ".jpeg"}
 MAX_FILE_SIZE = 10 * 1024 * 1024  # 10MB per spec
 
 app = Flask(__name__)
+
+
+def _array_to_base64_png(array):
+    image = Image.fromarray((np.clip(array, 0, 1) * 255).astype(np.uint8))
+    buffer = io.BytesIO()
+    image.save(buffer, format="PNG")
+    return base64.b64encode(buffer.getvalue()).decode("utf-8")
 
 
 def _run_prediction():
@@ -34,6 +45,8 @@ def _run_prediction():
 
     try:
         result = predict_from_bytes(image_bytes)
+        pneumonia_prob = result["pneumonia_probability"]
+        normal_prob = round(1.0 - pneumonia_prob, 4)
         confidence_pct = round(result["confidence"] * 100, 1)
         label = "Pneumonia" if result["prediction"] == "PNEUMONIA" else "Normal"
 
@@ -41,8 +54,11 @@ def _run_prediction():
             "prediction": label,
             "confidence": f"{confidence_pct}%",
             "confidence_value": confidence_pct,
-            "pneumonia_probability": result["pneumonia_probability"],
+            "pneumonia_probability": pneumonia_prob,
+            "normal_probability": normal_prob,
             "raw_prediction": result["prediction"],
+            "gradcam_image": _array_to_base64_png(result["overlay"]),
+            "original_image": _array_to_base64_png(result["preview"]),
         })
     except Exception as exc:
         return jsonify({"error": f"Analysis failed: {exc}"}), 500
