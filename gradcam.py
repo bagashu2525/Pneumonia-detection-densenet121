@@ -8,7 +8,7 @@ import numpy as np
 
 
 # ============================================
-# GRAD-CAM CLASS
+# GRAD-CAM
 # ============================================
 
 class GradCAM:
@@ -67,7 +67,17 @@ class GradCAM:
         input_tensor
     ):
 
-        output = self.model(input_tensor)
+        output = self.model(
+            input_tensor
+        )
+
+        confidence = torch.sigmoid(
+            output
+        ).item()
+
+        prediction = int(
+            confidence > 0.5
+        )
 
         self.model.zero_grad()
 
@@ -80,14 +90,14 @@ class GradCAM:
         activations = self.activations[0]
 
         weights = torch.mean(
+
             gradients,
             dim=(1, 2)
         )
 
         cam = torch.zeros(
+
             activations.shape[1:],
-            dtype=torch.float32
-        ).to(input_tensor.device)
 
         for i, weight in enumerate(weights):
             cam += weight * activations[i]
@@ -146,7 +156,9 @@ def create_heatmap(
 # ============================================
 
 def overlay_heatmap(
+
     cam,
+
     image,
     alpha=0.45
 ):

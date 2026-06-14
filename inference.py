@@ -9,10 +9,13 @@ import torch.nn as nn
 import torchvision.models as models
 import torchvision.transforms as transforms
 
+from torchvision.models import DenseNet121_Weights
+
 from PIL import Image
 
-import matplotlib.pyplot as plt
+import cv2
 import numpy as np
+import matplotlib.pyplot as plt
 
 from gradcam import GradCAM, overlay_heatmap
 
@@ -24,6 +27,8 @@ device = torch.device(
     "cuda" if torch.cuda.is_available()
     else "cpu"
 )
+
+print("\nUsing Device:", device)
 
 # ============================================
 # LOAD MODEL
@@ -71,6 +76,10 @@ model.load_state_dict(
         map_location=device
     )
 )
+# Disable inplace ReLU
+for module in model.modules():
+
+    if isinstance(module, nn.ReLU):
 
 # ============================================
 # DISABLE INPLACE RELU
@@ -91,7 +100,7 @@ model = model.to(device)
 model.eval()
 
 # ============================================
-# IMAGE TRANSFORM
+# TRANSFORM
 # ============================================
 
 transform = transforms.Compose([
