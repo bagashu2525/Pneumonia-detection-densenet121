@@ -76,10 +76,6 @@ model.load_state_dict(
         map_location=device
     )
 )
-# Disable inplace ReLU
-for module in model.modules():
-
-    if isinstance(module, nn.ReLU):
 
 # ============================================
 # DISABLE INPLACE RELU

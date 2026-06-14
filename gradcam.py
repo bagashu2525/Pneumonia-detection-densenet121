@@ -97,7 +97,7 @@ class GradCAM:
 
         cam = torch.zeros(
 
-            activations.shape[1:],
+            activations.shape[1:], device=activations.device)
 
         for i, weight in enumerate(weights):
             cam += weight * activations[i]
