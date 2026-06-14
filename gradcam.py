@@ -6,6 +6,7 @@ import torch
 import cv2
 import numpy as np
 
+
 # ============================================
 # GRAD-CAM
 # ============================================
@@ -24,20 +25,13 @@ class GradCAM:
         self.gradients = None
         self.activations = None
 
-        # ------------------------------------
-        # HOOKS
-        # ------------------------------------
-
-        self.forward_handle = (
-            self.target_layer.register_forward_hook(
-                self.forward_hook
-            )
+        # Register hooks
+        self.target_layer.register_forward_hook(
+            self.forward_hook
         )
 
-        self.backward_handle = (
-            self.target_layer.register_full_backward_hook(
-                self.backward_hook
-            )
+        self.target_layer.register_full_backward_hook(
+            self.backward_hook
         )
 
     # ========================================
@@ -50,10 +44,7 @@ class GradCAM:
         input,
         output
     ):
-
-        self.activations = (
-            output.clone().detach()
-        )
+        self.activations = output
 
     # ========================================
     # BACKWARD HOOK
@@ -65,10 +56,7 @@ class GradCAM:
         grad_input,
         grad_output
     ):
-
-        self.gradients = (
-            grad_output[0].clone().detach()
-        )
+        self.gradients = grad_output[0]
 
     # ========================================
     # GENERATE CAM
@@ -78,15 +66,6 @@ class GradCAM:
         self,
         input_tensor
     ):
-
-        self.model.eval()
-
-        self.gradients = None
-        self.activations = None
-
-        # ------------------------------------
-        # FORWARD
-        # ------------------------------------
 
         output = self.model(
             input_tensor
@@ -100,134 +79,76 @@ class GradCAM:
             confidence > 0.5
         )
 
-        # ------------------------------------
-        # BACKWARD
-        # ------------------------------------
-
         self.model.zero_grad()
 
-        score = output[:, 0]
-
-        score.backward(
-            torch.ones_like(score)
+        output.backward(
+            torch.ones_like(output)
         )
-
-        # ------------------------------------
-        # CHECK HOOKS
-        # ------------------------------------
-
-        if self.gradients is None:
-
-            raise RuntimeError(
-                "GradCAM gradients are None. "
-                "Check target layer."
-            )
-
-        if self.activations is None:
-
-            raise RuntimeError(
-                "GradCAM activations are None. "
-                "Check target layer."
-            )
-
-        # ------------------------------------
-        # FEATURES
-        # ------------------------------------
 
         gradients = self.gradients[0]
 
         activations = self.activations[0]
 
-        # ------------------------------------
-        # GLOBAL AVG POOLING
-        # ------------------------------------
-
         weights = torch.mean(
 
             gradients,
-
             dim=(1, 2)
         )
-
-        # ------------------------------------
-        # CAM
-        # ------------------------------------
 
         cam = torch.zeros(
 
             activations.shape[1:],
 
-            dtype=torch.float32,
-
-            device=activations.device
-        )
-
         for i, weight in enumerate(weights):
+            cam += weight * activations[i]
 
-            cam += (
+        cam = torch.relu(cam)
 
-                weight *
+        cam = cam.detach().cpu().numpy()
 
-                activations[i]
-            )
+        # Normalize
+        cam = np.maximum(cam, 0)
 
-        # ------------------------------------
-        # RELU
-        # ------------------------------------
+        cam -= np.min(cam)
 
-        cam = torch.relu(
-            cam
-        )
+        if np.max(cam) > 0:
+            cam /= np.max(cam)
 
-        # ------------------------------------
-        # NORMALIZATION
-        # ------------------------------------
+        return cam
 
-        cam_min = cam.min()
 
-        cam_max = cam.max()
+# ============================================
+# CREATE HEATMAP
+# ============================================
 
-        if (cam_max - cam_min) > 1e-8:
+def create_heatmap(
+    cam,
+    output_size=(224, 224)
+):
 
-            cam = (
+    cam = cv2.resize(
+        cam,
+        output_size,
+        interpolation=cv2.INTER_CUBIC
+    )
 
-                cam - cam_min
+    # Blue → Green → Yellow → Red
+    heatmap = cv2.applyColorMap(
+        np.uint8(cam * 255),
+        cv2.COLORMAP_JET
+    )
 
-            ) / (
+    heatmap = cv2.cvtColor(
+        heatmap,
+        cv2.COLOR_BGR2RGB
+    )
 
-                cam_max - cam_min
-            )
+    heatmap = (
+        heatmap.astype(np.float32)
+        / 255.0
+    )
 
-        else:
-
-            cam = torch.zeros_like(
-                cam
-            )
-
-        cam = cam.cpu().numpy()
-
-        return (
-
-            cam,
-
-            prediction,
-
-            confidence
-        )
-
-    # ========================================
-    # REMOVE HOOKS
-    # ========================================
-
-    def remove_hooks(self):
-
-        if self.forward_handle:
-
-            self.forward_handle.remove()
-
-        if self.backward_handle:
-
-            self.backward_handle.remove()
+    return heatmap
 
 
 # ============================================
@@ -239,32 +160,15 @@ def overlay_heatmap(
     cam,
 
     image,
-
-    alpha=0.55
-
+    alpha=0.45
 ):
 
-    cam = cv2.resize(
-
+    heatmap = create_heatmap(
         cam,
-
         (
             image.shape[1],
             image.shape[0]
         )
-    )
-
-    
-    heatmap = cv2.applyColorMap(
-    np.uint8(255 * cam),
-    cv2.COLORMAP_JET
-    )
-
-    heatmap = (
-        heatmap.astype(
-            np.float32
-        )
-        / 255.0
     )
 
     image = image.astype(
@@ -272,22 +176,19 @@ def overlay_heatmap(
     )
 
     if image.max() > 1:
-
         image /= 255.0
 
-    overlay = (
-
-        alpha * heatmap +
-
-        (1 - alpha) * image
+    overlay = cv2.addWeighted(
+        image,
+        1 - alpha,
+        heatmap,
+        alpha,
+        0
     )
 
     overlay = np.clip(
-
         overlay,
-
         0,
-
         1
     )
 
@@ -295,27 +196,100 @@ def overlay_heatmap(
 
 
 # ============================================
-# SAVE GRADCAM
+# CREATE HEATMAP + OVERLAY
 # ============================================
 
-def save_gradcam(
-
-    overlay,
-
-    save_path
-
+def create_heatmap_and_overlay(
+    cam,
+    image,
+    alpha=0.45
 ):
 
-    cv2.imwrite(
-
-        save_path,
-
-        np.uint8(
-            overlay * 255
+    heatmap = create_heatmap(
+        cam,
+        (
+            image.shape[1],
+            image.shape[0]
         )
     )
 
+    image = image.astype(
+        np.float32
+    )
+
+    if image.max() > 1:
+        image /= 255.0
+
+    overlay = cv2.addWeighted(
+        image,
+        1 - alpha,
+        heatmap,
+        alpha,
+        0
+    )
+
+    overlay = np.clip(
+        overlay,
+        0,
+        1
+    )
+
+    return heatmap, overlay
+
+
+# ============================================
+# SAVE IMAGE
+# ============================================
+
+def save_image(
+    image,
+    save_path
+):
+
+    image = np.uint8(
+        image * 255
+    )
+
+    image = cv2.cvtColor(
+        image,
+        cv2.COLOR_RGB2BGR
+    )
+
+    cv2.imwrite(
+        save_path,
+        image
+    )
+
     print(
-        f"[OK] Saved GradCAM: "
-        f"{save_path}"
+        f"[OK] Saved: {save_path}"
+    )
+
+
+# ============================================
+# SAVE HEATMAP
+# ============================================
+
+def save_heatmap(
+    heatmap,
+    save_path
+):
+
+    save_image(
+        heatmap,
+        save_path
+    )
+
+
+# ============================================
+# SAVE OVERLAY
+# ============================================
+
+def save_gradcam(
+    overlay,
+    save_path
+):
+
+    save_image(
+        overlay,
+        save_path
     )

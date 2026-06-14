@@ -2,8 +2,8 @@
 # inference.py
 # ============================================
 
-import os
-import time
+import io
+
 import torch
 import torch.nn as nn
 import torchvision.models as models
@@ -17,252 +17,14 @@ import cv2
 import numpy as np
 import matplotlib.pyplot as plt
 
-from gradcam import (
-    GradCAM,
-    overlay_heatmap,
-    save_gradcam
-)
-
-# ============================================
-# PUBLICATION QUALITY GRAD-CAM REPORT
-# ============================================
-
-from matplotlib.cm import ScalarMappable
-
-def create_gradcam_report(
-    original_image,
-    cam,
-    overlay,
-    prediction,
-    confidence,
-    true_label=None,
-    save_path="gradcam_report.png"
-):
-
-    # ========================================
-    # RESIZE CAM FOR VISUALIZATION
-    # ========================================
-
-    cam_display = cv2.resize(
-        cam,
-        (224, 224),
-        interpolation=cv2.INTER_CUBIC
-    )
-
-    # ========================================
-    # FIGURE
-    # ========================================
-
-    fig = plt.figure(
-        figsize=(16, 9),
-        facecolor="white"
-    )
-
-    gs = fig.add_gridspec(
-        3,
-        4,
-        height_ratios=[12, 1, 1]
-    )
-
-    # ========================================
-    # ORIGINAL IMAGE
-    # ========================================
-
-    ax1 = fig.add_subplot(gs[0, 0])
-
-    ax1.imshow(
-        original_image,
-        cmap="gray"
-    )
-
-    ax1.set_title(
-        "Original Chest X-ray",
-        fontsize=14,
-        fontweight="bold"
-    )
-
-    ax1.axis("off")
-
-    # ========================================
-    # HEATMAP
-    # ========================================
-
-    ax2 = fig.add_subplot(gs[0, 1])
-
-    heat = ax2.imshow(
-        cam_display,
-        cmap="jet",
-        vmin=0,
-        vmax=1
-    )
-
-    ax2.set_title(
-        "Grad-CAM Heatmap",
-        fontsize=14,
-        fontweight="bold"
-    )
-
-    ax2.axis("off")
-
-    # ========================================
-    # OVERLAY
-    # ========================================
-
-    ax3 = fig.add_subplot(gs[0, 2])
-
-    ax3.imshow(
-        overlay
-    )
-
-    ax3.set_title(
-        "Grad-CAM Overlay",
-        fontsize=14,
-        fontweight="bold"
-    )
-
-    ax3.axis("off")
-
-    # ========================================
-    # PREDICTION PANEL
-    # ========================================
-
-    ax4 = fig.add_subplot(gs[0, 3])
-
-    ax4.axis("off")
-
-    pred_color = (
-        "green"
-        if prediction == "NORMAL"
-        else "red"
-    )
-
-    info = (
-        f"Predicted: {prediction}\n\n"
-        f"Confidence: {confidence*100:.2f}%"
-    )
-
-    if true_label is not None:
-
-        info += (
-            f"\n\nTrue Label: {true_label}"
-        )
-
-    ax4.text(
-        0.05,
-        0.80,
-        info,
-        fontsize=14,
-        color=pred_color,
-        verticalalignment="top",
-        bbox=dict(
-            boxstyle="round,pad=0.5",
-            facecolor="white",
-            edgecolor="black",
-            alpha=0.95
-        )
-    )
-
-    # ========================================
-    # COLORBAR
-    # ========================================
-
-    cax = fig.add_subplot(gs[1, :])
-
-    sm = ScalarMappable(
-        cmap="jet"
-    )
-
-    sm.set_array([])
-
-    cbar = plt.colorbar(
-        sm,
-        cax=cax,
-        orientation="horizontal"
-    )
-
-    cbar.set_label(
-        "Grad-CAM Activation Strength",
-        fontsize=12,
-        fontweight="bold"
-    )
-
-    # ========================================
-    # EXPLANATION PANEL
-    # ========================================
-
-    ax_exp = fig.add_subplot(gs[2, :])
-
-    ax_exp.axis("off")
-
-    ax_exp.text(
-        0.5,
-        0.70,
-        "Grad-CAM highlights image regions that most influenced the model prediction.",
-        ha="center",
-        fontsize=10
-    )
-
-    ax_exp.text(
-        0.5,
-        0.25,
-        "Blue = Low Importance   |   Green = Moderate Importance   |   Yellow = High Importance   |   Red = Very High Importance",
-        ha="center",
-        fontsize=10,
-        fontweight="bold"
-    )
-
-    # ========================================
-    # SAVE
-    # ========================================
-
-    plt.tight_layout()
-
-    plt.savefig(
-        save_path,
-        dpi=300,
-        bbox_inches="tight"
-    )
-
-    print(
-        f"[OK] Saved Report: {save_path}"
-    )
-
-    plt.show()
-
-    plt.close()
-# ============================================
-# CONFIGURATION
-# ============================================
-
-MODEL_PATH = (
-    "best_pneumonia_model (2).pth"
-)
-
-IMAGE_PATH = (
-    "images\person100_bacteria_480.jpeg"
-)
-
-OUTPUT_DIR = (
-    "inference_outputs"
-)
-
-THRESHOLD = 0.50
-
-os.makedirs(
-    OUTPUT_DIR,
-    exist_ok=True
-)
+from gradcam import GradCAM, overlay_heatmap
 
 # ============================================
 # DEVICE
 # ============================================
 
 device = torch.device(
-
-    "cuda"
-
-    if torch.cuda.is_available()
-
+    "cuda" if torch.cuda.is_available()
     else "cpu"
 )
 
@@ -272,14 +34,10 @@ print("\nUsing Device:", device)
 # LOAD MODEL
 # ============================================
 
-model = models.densenet121(
-
-    weights=None
-)
+model = models.densenet121(weights=None)
 
 # ============================================
-# UPDATED CLASSIFIER
-# MUST MATCH PHASE 2
+# SAME ARCHITECTURE AS PHASE 2
 # ============================================
 
 model.classifier = nn.Sequential(
@@ -294,7 +52,7 @@ model.classifier = nn.Sequential(
     ),
 
     nn.ReLU(
-        inplace=True
+        inplace=False
     ),
 
     nn.Dropout(
@@ -308,15 +66,13 @@ model.classifier = nn.Sequential(
 )
 
 # ============================================
-# LOAD TRAINED WEIGHTS
+# LOAD TRAINED MODEL
 # ============================================
 
 model.load_state_dict(
 
     torch.load(
-
-        MODEL_PATH,
-
+        "best_pneumonia_model (2).pth",
         map_location=device
     )
 )
@@ -325,14 +81,23 @@ for module in model.modules():
 
     if isinstance(module, nn.ReLU):
 
+# ============================================
+# DISABLE INPLACE RELU
+# FOR GRADCAM
+# ============================================
+
+for module in model.modules():
+
+    if isinstance(
+        module,
+        nn.ReLU
+    ):
+
         module.inplace = False
+
 model = model.to(device)
 
 model.eval()
-
-print(
-    "[OK] Model Loaded Successfully"
-)
 
 # ============================================
 # TRANSFORM
@@ -367,229 +132,270 @@ transform = transforms.Compose([
 ])
 
 # ============================================
-# LOAD IMAGE
-# ============================================
-
-original_image = Image.open(
-    IMAGE_PATH
-).convert("RGB")
-
-# ============================================
-# PREPROCESS
-# ============================================
-
-input_tensor = transform(
-    original_image
-)
-
-input_tensor = input_tensor.unsqueeze(
-    0
-)
-
-input_tensor = input_tensor.to(
-    device
-)
-
-# ============================================
-# INFERENCE TIMER
-# ============================================
-
-start_time = time.time()
-
-with torch.no_grad():
-
-    output = model(
-        input_tensor
-    )
-
-    probability = torch.sigmoid(
-        output
-    ).item()
-
-end_time = time.time()
-
-inference_time = (
-    end_time - start_time
-)
-
-# ============================================
-# PREDICTION
-# ============================================
-
-prediction = (
-
-    "PNEUMONIA"
-
-    if probability > THRESHOLD
-
-    else "NORMAL"
-)
-
-# ============================================
-# PRINT RESULTS
-# ============================================
-
-print("\n===================================")
-print("PREDICTION RESULT")
-print("===================================")
-
-print(
-    f"Prediction : {prediction}"
-)
-
-print(
-    f"Confidence : "
-    f"{probability*100:.2f}%"
-)
-
-print(
-    f"Inference Time : "
-    f"{inference_time*1000:.2f} ms"
-)
-
-# ============================================
-# GRAD-CAM
+# GRADCAM TARGET LAYER
 # ============================================
 
 target_layer = (
     model.features.denseblock4.denselayer16.conv2
 )
 
-
 gradcam = GradCAM(
-
     model,
-
     target_layer
 )
 
-cam, _, _ = gradcam.generate_cam(
-    input_tensor
-)
-
 # ============================================
-# IMAGE FOR DISPLAY
+# THRESHOLD
 # ============================================
 
-image_np = np.array(
+PREDICTION_THRESHOLD = 0.50
 
-    original_image.resize(
-        (224,224)
+# ============================================
+# PREDICTION FUNCTION
+# ============================================
+
+def predict_from_image(image):
+
+    original_image = image.convert(
+        "RGB"
     )
 
-).astype(
-    np.float32
-) / 255.0
+    input_tensor = transform(
+        original_image
+    ).unsqueeze(0).to(device)
 
-# ============================================
-# OVERLAY
-# ============================================
+    # ========================================
+    # INFERENCE
+    # ========================================
 
-overlay = overlay_heatmap(
-    cam,
-    image_np,
-    alpha=0.30
-)
+    with torch.no_grad():
 
-# ============================================
-# SAVE HEATMAP
-# ============================================
+        logits = model(
+            input_tensor
+        )
 
-gradcam_path = (
+        probability = torch.sigmoid(
+            logits
+        ).item()
 
-    f"{OUTPUT_DIR}/"
+    # ========================================
+    # CLASS PREDICTION
+    # ========================================
 
-    f"gradcam_result.png"
-)
+    prediction = (
 
-save_gradcam(
+        "PNEUMONIA"
 
-    overlay,
+        if probability > PREDICTION_THRESHOLD
 
-    gradcam_path
-)
+        else "NORMAL"
+    )
 
-print(
-    f"[OK] GradCAM Saved: "
-    f"{gradcam_path}"
-)
+    confidence = (
 
-# ============================================
-# GENERATE REPORT
-# ============================================
+        probability
 
-create_gradcam_report(
+        if prediction == "PNEUMONIA"
 
-    original_image=np.array(
+        else (1.0 - probability)
+    )
+
+    # ========================================
+    # GRADCAM
+    # ========================================
+
+    cam = gradcam.generate_cam(
+        input_tensor
+    )
+
+    image_np = np.array(
+
         original_image.resize(
             (224, 224)
         )
-    ),
 
-    cam=cam,
+    ) / 255.0
 
-    overlay=overlay,
+    overlay = overlay_heatmap(
 
-    prediction=prediction,
+        cam,
 
-    confidence=probability,
+        image_np
+    )
 
-    true_label=None,   # optional
+    # ========================================
+    # RETURN RESULTS
+    # ========================================
 
-    save_path="gradcam_report.png"
-)
+    return {
 
+        "prediction":
+        prediction,
+
+        "confidence":
+        round(
+            confidence,
+            4
+        ),
+
+        "pneumonia_probability":
+        round(
+            probability,
+            4
+        ),
+
+        "overlay":
+        overlay,
+
+        "preview":
+        image_np,
+
+        "cam":
+        cam
+    }
 
 # ============================================
-# SAVE REPORT
+# BYTE INPUT SUPPORT
 # ============================================
 
-report_path = (
+def predict_from_bytes(
+    image_bytes
+):
 
-    f"{OUTPUT_DIR}/"
+    image = Image.open(
 
-    f"inference_report.txt"
-)
-
-with open(
-    report_path,
-    "w"
-) as f:
-
-    f.write(
-        "PNEUMONIA DETECTION REPORT\n\n"
+        io.BytesIO(
+            image_bytes
+        )
     )
 
-    f.write(
-        f"Prediction: {prediction}\n"
+    return predict_from_image(
+        image
     )
-
-    f.write(
-        f"Confidence: "
-        f"{probability*100:.2f}%\n"
-    )
-
-    f.write(
-        f"Inference Time: "
-        f"{inference_time*1000:.2f} ms\n"
-    )
-
-    f.write(
-        f"Threshold Used: "
-        f"{THRESHOLD}\n"
-    )
-
-print(
-    f"[OK] Report Saved: "
-    f"{report_path}"
-)
 
 # ============================================
-# CLEANUP
+# CLI TEST
 # ============================================
 
-gradcam.remove_hooks()
+def run_cli(
 
-print("\n===================================")
-print("INFERENCE COMPLETED")
-print("===================================")
+    image_path=
+    "00000002_000.png"
+):
+
+    print(
+        "[OK] Model Loaded Successfully"
+    )
+
+    original_image = Image.open(
+        image_path
+    ).convert(
+        "RGB"
+    )
+
+    result = predict_from_image(
+        original_image
+    )
+
+    print(
+        "\n========== RESULT ==========\n"
+    )
+
+    print(
+        f"Prediction : "
+        f"{result['prediction']}"
+    )
+
+    print(
+        f"Confidence : "
+        f"{result['confidence']:.4f}"
+    )
+
+    print(
+        f"Pneumonia Probability : "
+        f"{result['pneumonia_probability']:.4f}"
+    )
+
+    # ========================================
+    # VISUALIZATION
+    # ========================================
+
+    plt.figure(
+        figsize=(15, 5)
+    )
+
+    # ORIGINAL
+
+    plt.subplot(
+        1,
+        3,
+        1
+    )
+
+    plt.imshow(
+        result["preview"]
+    )
+
+    plt.title(
+        "Original X-ray"
+    )
+
+    plt.axis(
+        "off"
+    )
+
+    # HEATMAP
+
+    plt.subplot(
+        1,
+        3,
+        2
+    )
+
+    plt.imshow(
+        result["cam"],
+        cmap="jet"
+    )
+
+    plt.title(
+        "Grad-CAM Heatmap"
+    )
+
+    plt.axis(
+        "off"
+    )
+
+    # OVERLAY
+
+    plt.subplot(
+        1,
+        3,
+        3
+    )
+
+    plt.imshow(
+        result["overlay"]
+    )
+
+    plt.title(
+
+        f"{result['prediction']} "
+
+        f"({result['pneumonia_probability']:.2f})"
+    )
+
+    plt.axis(
+        "off"
+    )
+
+    plt.tight_layout()
+
+    plt.show()
+
+# ============================================
+# MAIN
+# ============================================
+
+if __name__ == "__main__":
+
+    run_cli()
